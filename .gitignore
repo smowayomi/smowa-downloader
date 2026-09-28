@@ -1,0 +1,9 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/tools/*
+!src-tauri/tools/.gitkeep
+release/
+test-results/
+playwright-report/
+.preview/

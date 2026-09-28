@@ -1,0 +1,423 @@
+import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import {
+  createIcons,
+  Download,
+  History,
+  Settings2,
+  ArrowDownToLine,
+  Link,
+  FolderOpen,
+  Plus,
+  Check,
+  X,
+  RotateCcw,
+  Search,
+  ExternalLink,
+  Monitor,
+  Chrome,
+  ChevronRight,
+  Film,
+  CircleHelp,
+} from "lucide";
+import "./style.css";
+
+type Options = {
+  url: string;
+  resolution: number;
+  codec: string;
+  format: string;
+  quality: string;
+  folder: string;
+};
+type Job = {
+  id: string;
+  title: string;
+  url: string;
+  status: string;
+  percent: number;
+  speed: string;
+  eta: string;
+  error: string;
+  file: string;
+  created: number;
+  options: Options;
+};
+type Video = {
+  title: string;
+  thumbnail: string;
+  duration: number;
+  uploader: string;
+  url: string;
+  formats: {
+    height?: number;
+    vcodec?: string;
+    acodec?: string;
+    ext?: string;
+  }[];
+};
+const desktop = "__TAURI_INTERNALS__" in window;
+let jobs: Job[] = [],
+  page = "downloads",
+  video: Video | null = null,
+  analyzing = false,
+  busy = false,
+  folder = localStorage.getItem("folder") || "",
+  filter = "",
+  pending: string[] = [],
+  toolHealth: Record<string, boolean> = {};
+const icons = () =>
+  createIcons({
+    icons: {
+      Download,
+      History,
+      Settings2,
+      ArrowDownToLine,
+      Link,
+      FolderOpen,
+      Plus,
+      Check,
+      X,
+      RotateCcw,
+      Search,
+      ExternalLink,
+      Monitor,
+      Chrome,
+      ChevronRight,
+      Film,
+      CircleHelp,
+    },
+    attrs: {
+      "aria-hidden": "true",
+      width: 18,
+      height: 18,
+      "stroke-width": 1.7,
+    },
+  });
+const icon = (name: string) => `<i data-lucide="${name}"></i>`;
+const esc = (v: unknown) =>
+  String(v ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ]!,
+  );
+const active = (j: Job) =>
+  ["queued", "downloading", "processing"].includes(j.status);
+const $ = <T extends HTMLElement>(id: string) =>
+  document.getElementById(id) as T;
+function notify(message: string, error = false) {
+  const el = $("toast");
+  el.textContent = message;
+  el.className = error ? "toast error" : "toast";
+  el.hidden = false;
+  setTimeout(() => {
+    el.hidden = true;
+  }, 7000);
+}
+async function call<T>(
+  name: string,
+  args?: Record<string, unknown>,
+): Promise<T> {
+  if (!desktop)
+    throw Error(
+      "This is a browser preview. Open Smowa.exe to use desktop features.",
+    );
+  return invoke<T>(name, args);
+}
+
+document.querySelector("#app")!.innerHTML = `
+<aside><div class="brand"><span class="brand-mark">${icon("arrow-down-to-line")}</span><span>smowa<span class="brand-dot">.</span></span></div><div class="workspace-label">YOUR LIBRARY</div><nav><button data-page="downloads" class="nav active">${icon("download")}Downloads<span id="queue-count" class="count">0</span></button><button data-page="history" class="nav">${icon("history")}History</button></nav><div class="sidebar-bottom"><button data-page="settings" class="nav">${icon("chrome")}Browser helper</button><div class="tray-note"><span class="status-dot"></span><div>Ready in the background<small>Close the window. Keep downloading.</small></div></div><div class="version">SMOWA FOR WINDOWS <span>v0.1</span></div></div></aside>
+<main><header><div class="breadcrumb">Workspace ${icon("chevron-right")} <span id="crumb">Downloads</span></div><span class="local-badge">${icon("monitor")} Local & private</span></header><div class="content"><section id="downloads-page"><div class="page-heading"><div><div class="eyebrow">SAVE SOMETHING GOOD</div><h1>Downloads</h1><p>Your favorite videos. In your format. On your device.</p></div><button class="secondary" id="focus-url">${icon("plus")} New download</button></div>
+<section class="composer"><div class="composer-top"><span class="section-label">${icon("link")} ADD A VIDEO</span><div class="platforms"><span>YouTube</span><span>TikTok</span><span>Instagram</span></div></div><form id="analyze-form"><label class="sr-only" for="url">Video URL</label><div class="url-row"><input id="url" type="url" required placeholder="Paste a video link here…" autocomplete="off"><button class="primary" id="analyze" type="submit">Get video ${icon("chevron-right")}</button></div></form><div id="analyze-error" class="inline-error" role="alert" hidden></div><div id="video-info" hidden></div><div id="options" hidden><div class="option-grid"><label>Resolution<select id="resolution"></select></label><label>Video codec<select id="codec"></select></label><label>Format<select id="format"><option value="mp4">MP4 · Video</option><option value="mkv">MKV · Video</option><option value="webm">WebM · Video</option><option value="mp3">MP3 · Audio</option><option value="m4a">M4A · Audio</option></select></label><label>Quality<select id="quality"><option value="best">Best available</option><option value="balanced">Balanced · prefer 30 fps</option><option value="small">Smaller · prefer lower bitrate</option></select></label></div><p class="hint" id="quality-hint">Original streams, no video re-encoding. Resolution is a maximum; availability depends on the video.</p><div class="destination"><button id="choose-folder" class="folder-button">${icon("folder-open")}<span><small>SAVE TO</small><span id="folder-label"></span></span></button><button id="download" class="primary">${icon("arrow-down-to-line")} Download</button></div></div><div id="composer-hint" class="composer-hint">${icon("chrome")} Browsing something good? Send it here with the Chrome helper.</div></section>
+<div class="list-heading"><h2>Download queue <span id="active-count">0</span></h2><span>One at a time. Everything in order.</span></div><div id="queue"></div><div class="tip"><span>${icon("circle-help")}</span><p><strong>Made to stay out of your way.</strong> Smowa lives in your system tray. Use the browser helper to bring a video straight into this window.</p></div></section>
+<section id="history-page" hidden><div class="page-heading"><div><div class="eyebrow">YOUR SAVED MOMENTS</div><h1>Download history</h1><p>Everything you’ve downloaded, all in one place.</p></div><button id="clear-history" class="secondary">Clear history</button></div><label class="search-box">${icon("search")}<input id="search" placeholder="Search title or website" aria-label="Search download history"></label><div id="history-list"></div></section>
+<section id="settings-page" hidden><div class="page-heading"><div><div class="eyebrow">BROWSER TO DESKTOP</div><h1>A little helper. A lot easier.</h1><p>One click in Chrome brings the current video to Smowa.</p></div></div><section class="setup-card"><div class="setup-icon">${icon("chrome")}</div><h2>Connect Chrome</h2><p>Load the included extension once, then pair it with this app.</p><ol><li>Open <code>chrome://extensions</code> and enable <strong>Developer mode</strong>.</li><li>Click <strong>Load unpacked</strong> and select the <code>extension</code> folder beside Smowa.exe.</li><li>Copy the extension’s ID and paste it below.</li></ol><label for="extension-id">Chrome extension ID</label><div class="url-row"><input id="extension-id" placeholder="32-letter extension ID" maxlength="32"><button id="connect" class="primary">Connect helper</button></div><p id="connect-result" role="status"></p><div class="hint">Pin Smowa to the Chrome toolbar. Click it on a video to open the download options, even when the app is closed.</div></section><section class="setup-card"><h2>Download engine</h2><p>yt-dlp handles supported websites. FFmpeg merges streams and converts audio.</p><div id="health" class="health"></div><p class="hint">If a site changes, close Smowa and run Update tools.cmd in the release folder. Some private or restricted videos require authentication and are not supported by this version.</p><button id="check-tools" class="secondary">Check tools</button></section></section></div><footer><span><span class="status-dot"></span> <span id="footer-status">Ready when you are</span></span><span>Files stay on your computer</span></footer></main><div id="toast" class="toast" role="status" hidden></div>`;
+
+function navigate(next: string) {
+  page = next;
+  for (const p of ["downloads", "history", "settings"])
+    $(`${p}-page`).hidden = p !== page;
+  document
+    .querySelectorAll("[data-page]")
+    .forEach((b) =>
+      b.classList.toggle("active", (b as HTMLElement).dataset.page === page),
+    );
+  $("crumb").textContent =
+    page === "settings"
+      ? "Browser helper"
+      : page === "history"
+        ? "History"
+        : "Downloads";
+  renderJobs();
+  if (page === "settings") void checkTools();
+}
+document
+  .querySelectorAll("[data-page]")
+  .forEach((b) =>
+    b.addEventListener("click", () =>
+      navigate((b as HTMLElement).dataset.page!),
+    ),
+  );
+$("focus-url").onclick = () => {
+  $<HTMLInputElement>("url").focus();
+};
+$("search").oninput = () => {
+  filter = $<HTMLInputElement>("search").value.toLowerCase();
+  renderJobs();
+};
+$("clear-history").onclick = async () => {
+  if (
+    !confirm(
+      "Clear finished and stopped entries from history? Your downloaded files will be kept.",
+    )
+  )
+    return;
+  try {
+    await call("clear_history");
+    await refresh();
+  } catch (e) {
+    notify(String(e), true);
+  }
+};
+function renderJobs() {
+  const queue = jobs.filter(active),
+    history = jobs.filter(
+      (j) => !active(j) && `${j.title} ${j.url}`.toLowerCase().includes(filter),
+    );
+  $("queue-count").textContent = String(queue.length);
+  $("active-count").textContent = String(queue.length);
+  $("footer-status").textContent = queue.length
+    ? `${queue.length} download${queue.length === 1 ? "" : "s"} in queue`
+    : "Ready when you are";
+  $("queue").innerHTML = queue.length
+    ? queue.map(card).join("")
+    : `<div class="empty-state"><div class="empty-icon">${icon("download")}</div><h3>A home for your next download</h3><p>Paste a link above or send a video from Chrome.<br>We’ll take it from there.</p><div class="empty-tags"><span>Up to 8K</span><span>Video & audio</span><span>Your choice of format</span></div></div>`;
+  $("history-list").innerHTML = history.length
+    ? history.map(card).join("")
+    : `<div class="empty-state"><div class="empty-icon">${icon("history")}</div><h3>${filter ? "No matching downloads" : "Your collection starts here"}</h3><p>${filter ? "Try another title or website." : "Finished downloads will appear here."}</p></div>`;
+  document.querySelectorAll<HTMLButtonElement>("[data-action]").forEach(
+    (b) =>
+      (b.onclick = async () => {
+        b.disabled = true;
+        try {
+          await call(b.dataset.action!, { id: b.dataset.id });
+          await refresh();
+        } catch (e) {
+          notify(String(e), true);
+        } finally {
+          b.disabled = false;
+        }
+      }),
+  );
+  icons();
+}
+function card(j: Job) {
+  let host = "";
+  try {
+    host = new URL(j.url).hostname.replace("www.", "");
+  } catch {}
+  const running = active(j),
+    done = j.status === "completed";
+  return `<article class="job"><div class="job-icon ${done ? "complete" : ""}">${icon(done ? "check" : "film")}</div><div class="job-body"><div class="job-top"><h3 title="${esc(j.title)}">${esc(j.title || j.url)}</h3><span class="job-status ${esc(j.status)}">${esc(j.status)}</span></div><div class="job-meta">${esc(host)}<span>·</span>${esc(j.options.format.toUpperCase())}<span>·</span>${j.options.resolution ? j.options.resolution + "p" : "Best"}<span>·</span>${new Date(j.created * 1000).toLocaleDateString()}</div>${running ? `<progress max="100" value="${j.percent}" aria-label="Download progress"></progress><div class="progress-label"><span>${j.status === "queued" ? "Waiting in queue" : j.status === "processing" ? "Merging / converting" : esc(j.speed) || "Connecting…"}</span><span>${j.eta ? "ETA " + esc(j.eta) + " · " : ""}${j.percent.toFixed(1)}%</span></div>` : ""}${j.error ? `<details><summary>Download details</summary><pre>${esc(j.error)}</pre></details>` : ""}</div><button class="icon-button" data-action="${running ? "cancel" : done ? "reveal" : "retry"}" data-id="${j.id}" aria-label="${running ? "Cancel download" : done ? "Show in folder" : "Retry download"}" title="${running ? "Cancel download" : done ? "Show in folder" : "Retry download"}">${icon(running ? "x" : done ? "folder-open" : "rotate-ccw")}</button></article>`;
+}
+
+$("analyze-form").onsubmit = async (e) => {
+  e.preventDefault();
+  await analyze($<HTMLInputElement>("url").value);
+};
+async function analyze(url: string) {
+  if (analyzing) return;
+  analyzing = true;
+  video = null;
+  $("options").hidden = true;
+  $("video-info").hidden = true;
+  $("composer-hint").hidden = true;
+  $("analyze-error").hidden = true;
+  $<HTMLButtonElement>("analyze").disabled = true;
+  $("analyze").textContent = "Getting video…";
+  try {
+    video = await call<Video>("inspect_video", { url });
+    $("video-info").hidden = false;
+    let thumb = "";
+    try {
+      const u = new URL(video.thumbnail);
+      if (u.protocol === "https:") thumb = u.href;
+    } catch {}
+    $("video-info").innerHTML =
+      `${thumb ? `<img src="${esc(thumb)}" alt="" referrerpolicy="no-referrer">` : `<div class="video-placeholder">${icon("film")}</div>`}<div><span class="section-label">READY TO DOWNLOAD</span><h3>${esc(video.title)}</h3><p>${esc(video.uploader || "Video")} ${video.duration ? "· " + Math.floor(video.duration / 60) + ":" + String(Math.floor(video.duration % 60)).padStart(2, "0") : ""}</p></div>`;
+    const heights = [
+      ...new Set(
+        (video.formats || [])
+          .map((f) => f.height)
+          .filter((h): h is number => !!h),
+      ),
+    ];
+    $<HTMLSelectElement>("resolution").innerHTML =
+      '<option value="0">Best available</option>' +
+      [4320, 2160, 1440, 1080, 720, 480, 360]
+        .filter(
+          (h) =>
+            h <= Math.max(...heights, 0) ||
+            (h === 360 && heights.some((x) => x < 360)),
+        )
+        .map((h) => `<option value="${h}">${h}p maximum</option>`)
+        .join("");
+    const codecs = (video.formats || []).map((f) => f.vcodec || "");
+    $<HTMLSelectElement>("codec").innerHTML =
+      '<option value="auto">Auto · recommended</option>' +
+      [
+        ["h264", "H.264 · compatible", "avc"],
+        ["vp9", "VP9", "vp9"],
+        ["av1", "AV1 · efficient", "av01"],
+      ]
+        .filter((c) => codecs.some((v) => v.startsWith(c[2])))
+        .map((c) => `<option value="${c[0]}">${c[1]}</option>`)
+        .join("");
+    $("options").hidden = false;
+    updateFormat();
+    updateFolder();
+    icons();
+  } catch (e) {
+    $("analyze-error").textContent = String(e);
+    $("analyze-error").hidden = false;
+    $("composer-hint").hidden = false;
+  } finally {
+    analyzing = false;
+    $<HTMLButtonElement>("analyze").disabled = false;
+    $("analyze").innerHTML = `Get video ${icon("chevron-right")}`;
+    icons();
+  }
+}
+function updateFolder() {
+  $("folder-label").textContent = folder || "Choose a download folder";
+}
+$("choose-folder").onclick = async () => {
+  try {
+    if (!desktop)
+      throw Error("Folder selection is available in the desktop app.");
+    const result = await open({
+      directory: true,
+      multiple: false,
+      defaultPath: folder || undefined,
+    });
+    if (typeof result === "string") {
+      folder = result;
+      localStorage.setItem("folder", folder);
+      updateFolder();
+    }
+  } catch (e) {
+    notify(String(e), true);
+  }
+};
+function updateFormat() {
+  const audio = ["mp3", "m4a"].includes($<HTMLSelectElement>("format").value);
+  $<HTMLSelectElement>("resolution").disabled = audio;
+  $<HTMLSelectElement>("codec").disabled = audio;
+  $("quality-hint").textContent = audio
+    ? "Audio is extracted and converted with FFmpeg. Quality controls the audio encoding."
+    : "Original streams, no video re-encoding. Resolution is a maximum; availability depends on the video.";
+}
+$("format").onchange = updateFormat;
+$("download").onclick = async () => {
+  if (!video || busy) return;
+  busy = true;
+  $<HTMLButtonElement>("download").disabled = true;
+  try {
+    const options: Options = {
+      url: video.url,
+      resolution: Number($<HTMLSelectElement>("resolution").value),
+      codec: $<HTMLSelectElement>("codec").value,
+      format: $<HTMLSelectElement>("format").value,
+      quality: $<HTMLSelectElement>("quality").value,
+      folder,
+    };
+    await call("start_download", { options, title: video.title });
+    notify("Added to your download queue");
+    await refresh();
+  } catch (e) {
+    notify(String(e), true);
+  } finally {
+    busy = false;
+    $<HTMLButtonElement>("download").disabled = false;
+  }
+};
+$("connect").onclick = async () => {
+  try {
+    await call("register_extension", {
+      extensionId: $<HTMLInputElement>("extension-id").value.trim(),
+    });
+    $("connect-result").textContent =
+      "Connected. Click the Smowa extension on a video to try it.";
+    localStorage.setItem(
+      "extensionId",
+      $<HTMLInputElement>("extension-id").value.trim(),
+    );
+  } catch (e) {
+    $("connect-result").textContent = String(e);
+  }
+};
+$<HTMLInputElement>("extension-id").value =
+  localStorage.getItem("extensionId") || "";
+async function checkTools() {
+  try {
+    toolHealth = await call("health");
+    $("health").innerHTML = Object.entries(toolHealth)
+      .map(
+        ([k, v]) =>
+          `<span class="health-item ${v ? "ok" : "missing"}">${icon(v ? "check" : "x")}${esc(k)} · ${v ? "Ready" : "Missing"}</span>`,
+      )
+      .join("");
+    icons();
+  } catch (e) {
+    $("health").textContent = String(e);
+  }
+}
+$("check-tools").onclick = checkTools;
+let refreshing = false;
+async function refresh() {
+  if (!desktop || refreshing) return;
+  refreshing = true;
+  try {
+    const data = await call<{
+      jobs: Job[];
+      pending: string[];
+      storageError: string;
+    }>("snapshot");
+    const changed = JSON.stringify(jobs) !== JSON.stringify(data.jobs);
+    jobs = data.jobs;
+    if (changed) renderJobs();
+    pending.push(...data.pending);
+    if (data.storageError) notify(data.storageError, true);
+    if (pending.length && !analyzing) {
+      const url = pending.shift()!;
+      navigate("downloads");
+      $<HTMLInputElement>("url").value = url;
+      void analyze(url);
+    }
+  } catch (e) {
+    console.error(e);
+  } finally {
+    refreshing = false;
+  }
+}
+async function init() {
+  icons();
+  renderJobs();
+  if (desktop) {
+    try {
+      const d = await call<{ folder: string }>("defaults");
+      if (!folder) folder = d.folder;
+      updateFolder();
+      await refresh();
+      setInterval(() => void refresh(), 700);
+    } catch (e) {
+      notify(String(e), true);
+    }
+  } else {
+    $("footer-status").textContent =
+      "Design preview · open the desktop app to download";
+  }
+}
+void init();
