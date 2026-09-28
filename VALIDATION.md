@@ -15,3 +15,9 @@ Verified on this Windows machine:
 Not yet verified: loading the unpacked extension into a user's Chrome profile and clicking its toolbar button; live TikTok/Instagram extraction; restricted/private content (unsupported in this version). The protocol helper itself was exercised directly using Chrome-compatible framed messages.
 
 Reproducible browser check: run `npm run dev`, then `node scripts/ui-check.mjs`. Native check: launch a test app with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9227`, then run `node scripts/native-check.mjs`. The native check makes a real small download into `.preview/downloads` and adds a history entry. Close the test process afterwards and relaunch without that environment variable.
+
+## Smowaudio visual alignment
+
+The interface now uses Smowaudio's exact dark palette and native font stacks, 72 px navigation rail, compact top bar, neutral primary buttons and shared multicolor brand mark. The extension popup and Windows/tray icons follow the same styling.
+
+`node scripts/layout-check.mjs` exercises the actual loading transition with a delayed metadata fixture, checks 16 px inner bottom padding (17 px including the border) at 1180 px and 860 px, and captures idle, loading, loaded options and helper screens for visual review. Those checks and the production frontend/native release builds passed. The test fixture does not download a video or change user history.

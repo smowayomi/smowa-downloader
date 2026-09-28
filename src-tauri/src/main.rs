@@ -489,13 +489,17 @@ fn main() {
             for y in 0..32 {
                 for x in 0..32 {
                     let i = (y * 32 + x) * 4;
-                    let arrow = (13..19).contains(&x) && (5..22).contains(&y)
-                        || (16..25).contains(&y) && x >= y - 9 && x <= 40 - y;
-                    let c = if arrow {
-                        [184, 242, 112, 255]
-                    } else {
-                        [24, 30, 38, 255]
-                    };
+                    let bars = [
+                        (5..9, 13, [240, 162, 59, 255]),
+                        (11..15, 5, [76, 196, 160, 255]),
+                        (17..21, 10, [234, 106, 146, 255]),
+                        (23..27, 17, [148, 155, 255, 255]),
+                    ];
+                    let c = bars
+                        .iter()
+                        .find(|(range, top, _)| range.contains(&x) && y >= *top && y < 27)
+                        .map(|(_, _, color)| *color)
+                        .unwrap_or([22, 24, 29, 255]);
                     rgba[i..i + 4].copy_from_slice(&c);
                 }
             }
