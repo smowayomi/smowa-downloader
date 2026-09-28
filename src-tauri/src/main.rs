@@ -490,24 +490,7 @@ fn main() {
                 None::<&str>,
             )?;
             let menu = Menu::with_items(app, &[&open, &quit])?;
-            let mut rgba = vec![0u8; 32 * 32 * 4];
-            for y in 0..32 {
-                for x in 0..32 {
-                    let i = (y * 32 + x) * 4;
-                    let bars = [
-                        (5..9, 13, [240, 162, 59, 255]),
-                        (11..15, 5, [76, 196, 160, 255]),
-                        (17..21, 10, [234, 106, 146, 255]),
-                        (23..27, 17, [148, 155, 255, 255]),
-                    ];
-                    let c = bars
-                        .iter()
-                        .find(|(range, top, _)| range.contains(&x) && y >= *top && y < 27)
-                        .map(|(_, _, color)| *color)
-                        .unwrap_or([22, 24, 29, 255]);
-                    rgba[i..i + 4].copy_from_slice(&c);
-                }
-            }
+            let rgba = include_bytes!("../icons/tray.rgba").to_vec();
             TrayIconBuilder::new()
                 .icon(tauri::image::Image::new_owned(rgba, 32, 32))
                 .tooltip("Smowa — running in the background")
