@@ -109,7 +109,7 @@ aside {
   margin-top: auto;
 }
 main {
-  margin-left: 60px;
+  margin-left: 0;
   min-width: 0;
   flex: 1;
   display: flex;
@@ -690,7 +690,7 @@ code {
 .toast {
   position: fixed;
   bottom: 24px;
-  left: calc(50% + 30px);
+  left: 50%;
   transform: translateX(-50%);
   padding: 12px 18px;
   background: var(--raised);
@@ -741,7 +741,7 @@ code {
   .content { padding: 10px; }
   .job-icon { display: none; }
   #folder-label { max-width: 260px; }
-  .toast { left: 70px; right: 10px; transform: none; }
+  .toast { left: 10px; right: 10px; transform: none; }
   footer > span:last-child { display: none; }
 }
 @media (max-height: 650px) {
@@ -760,3 +760,6 @@ code {
   place-items: center;
   color: var(--muted);
 }
+
+#settings-page { border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+#settings-toggle[aria-expanded="true"] { border-color: var(--focus); color: var(--focus); }

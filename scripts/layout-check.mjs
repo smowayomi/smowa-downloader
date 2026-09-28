@@ -43,7 +43,7 @@ try {
     .getByRole("textbox", { name: "Video URL", exact: true })
     .fill("https://www.youtube.com/watch?v=test");
   await page.getByRole("button", { name: "Get video" }).click();
-  await page.getByRole("button", { name: "Getting videoâ€¦" }).waitFor();
+  await page.getByRole("button", { name: "Getting video…" }).waitFor();
   for (const width of [1180, 880, 760, 640]) {
     await page.setViewportSize({ width, height: 820 });
     const gap = await page.evaluate(
@@ -84,6 +84,26 @@ try {
   }
   await page.evaluate(() => {
     const previous = window.__TAURI_INTERNALS__.invoke;
+    window.testJobs = [];
+    window.__TAURI_INTERNALS__.invoke = async (cmd, args) => {
+      if (cmd === 'snapshot') return {jobs: structuredClone(window.testJobs), pending: [], storageError: ''};
+      if (cmd === 'start_download') {
+        window.testJobs.unshift({id:'test-job', title:args.title, url:args.options.url, options:args.options, status:'queued', percent:0, speed:'', eta:'', error:'', file:'', created:Date.now()/1000});
+        return 'test-job';
+      }
+      return previous(cmd, args);
+    };
+  });
+  await page.getByRole('textbox', {name:'Search downloads'}).fill('no match');
+  await page.locator('#download').click();
+  await page.locator('#history-list .job-status').filter({hasText:'queued'}).waitFor();
+  if (await page.locator('#search').inputValue()) throw Error('New download hidden by search');
+  await page.evaluate(() => { window.testJobs[0].status = 'completed'; window.testJobs[0].percent = 100; });
+  await page.getByRole('button', {name:'Show in folder', exact:true}).waitFor();
+  if (await page.locator('#history-list .job').count() !== 1) throw Error('Job lost or duplicated on completion');
+  console.log('PASS queued download appears immediately and remains after completion');
+  await page.evaluate(() => {
+    const previous = window.__TAURI_INTERNALS__.invoke;
     window.__TAURI_INTERNALS__.invoke = async (cmd) =>
       cmd === "inspect_video"
         ? {
@@ -111,7 +131,7 @@ try {
     throw Error("Audio source allowed MP4 output");
   console.log("PASS: audio-only source automatically selects audio output");
   await page
-    .getByRole("button", { name: "Browser helper", exact: true })
+    .getByRole("button", { name: "Settings", exact: true })
     .click();
   await page.screenshot({
     path: ".preview/smowaudio-helper.png",
