@@ -68,7 +68,8 @@ if ($DownloadMissing) {
         $line = [regex]::Match($checks, '(?m)^([a-fA-F0-9]{64})\s+(node-v24\.[0-9.]+-win-x64.zip)\s*$')
         if (!$line.Success) { throw 'Node.js checksum not found' }
         $archive = Join-Path $Destination 'node.zip'
-        Get-VerifiedFile "$base/$($line.Groups[2].Value)" $line.Groups[1].Value $archive
+        $nodeVersion = $line.Groups[2].Value -replace '^node-(v[0-9.]+)-win-x64.zip$', '$1'
+        Get-VerifiedFile "https://nodejs.org/dist/$nodeVersion/$($line.Groups[2].Value)" $line.Groups[1].Value $archive
         $nodeExtract = Join-Path $Destination ('node-' + [guid]::NewGuid())
         New-Item -ItemType Directory -Force $nodeExtract | Out-Null
         & tar.exe -xf $archive -C $nodeExtract
