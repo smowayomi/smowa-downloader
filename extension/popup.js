@@ -37,7 +37,7 @@ async function send() {
     const message = e instanceof Error ? e.message : String(e);
     if (/not found|not registered/i.test(message))
       status.textContent =
-        "Brave or Chrome cannot find the desktop helper. Open Smowa → Browser helper and connect the ID shown below, then reload this extension.";
+        "The browser cannot find the desktop helper. If this ID is already connected in Smowa, save your work, fully exit Brave or Chrome using its menu, and reopen it. Otherwise connect the ID below in Smowa Browser helper.";
     else if (/forbidden|not allowed|access.*denied/i.test(message))
       status.textContent =
         "This extension ID is not allowed by the desktop helper. Reconnect the ID shown below in Smowa → Browser helper.";

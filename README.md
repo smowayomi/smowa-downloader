@@ -60,3 +60,7 @@ References: [Tauri](https://v2.tauri.app/), [Chrome native messaging](https://de
 Like [MeTube](https://github.com/alexta69/metube), Smowa uses [yt-dlp's supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md), rather than maintaining a separate website list. Examples include YouTube, Vimeo, Twitch, TikTok, Instagram, X/Twitter, Reddit, Dailymotion, Facebook, SoundCloud, Bandcamp and Internet Archive. Generic embedded media and direct HTTP(S) media links are attempted too. The app, native bridge and Brave/Chrome extension all accept these links without domain restrictions. Audio-only metadata selects an audio output format automatically.
 
 Actual availability follows the bundled yt-dlp version; a listed site is not a guarantee that every URL works. Login-required content, site restrictions, DRM and broken extractors remain limitations. Single-item downloads are supported; playlists and cookie import remain outside this version. Run Update tools.cmd to update yt-dlp.
+
+### Already paired, but the host is not found
+
+Save unfinished browser work, use the browser menu to **Exit** completely, then open Brave or Chrome again. Reloading the extension or using the browser restart page may not resolve this. Keep the app folder in the location used for pairing. If the error persists, the extension displays the exact native-messaging error and its ID for diagnosis.

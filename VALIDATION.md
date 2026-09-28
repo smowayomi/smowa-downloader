@@ -33,3 +33,7 @@ Verified the user's saved ID matched the unpacked extension in Brave. A fresh is
 Removed the three-domain allowlist from Rust validation (shared by the app and native bridge) and the extension. HTTP(S) media URLs, including custom ports and unknown domains, now reach yt-dlp's site-specific and generic extractors. Non-web schemes and embedded credentials remain rejected. Extension version: 0.1.2.
 
 Validation passed: Rust tests, Clippy, frontend/release builds; extension URL tests for Vimeo, Twitch, SoundCloud, Archive.org and generic links; audio-only UI fixture; real generic MP4 download through the native app (788,493 bytes); real generic MP3 metadata correctly detected as audio-only. The bundled engine lists 1,752 extractor entries, not distinct websites. Individual sites were not exhaustively tested. Support follows the installed engine, as in MeTube; DRM, authentication and playlist limitations still apply.
+
+## Normal Brave profile confirmation
+
+The user still encountered host-not-found after extension reload and a browser restart. Registration, nativeMessaging permission, ID and relevant policy checks were correct; isolated tests with the normal Chromium sandbox also passed. The user then fully exited Brave, and the same executable was launched with session restore and local diagnostic logging. The user confirmed Smowa opened successfully from the actual extension in their normal profile. The precise cause of the earlier discrepancy is not established; no browser security or policy settings were changed.
