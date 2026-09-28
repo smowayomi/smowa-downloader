@@ -76,7 +76,7 @@ jobs:
             gh release create $tag --repo $env:GITHUB_REPOSITORY --verify-tag --draft --title "SmowaDL $tag" --notes-file .github/RELEASE_NOTES.md
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           }
-          gh release upload $tag release-assets/* --repo $env:GITHUB_REPOSITORY --clobber
+          gh release upload $tag (Get-ChildItem release-assets -File).FullName --repo $env:GITHUB_REPOSITORY --clobber
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
