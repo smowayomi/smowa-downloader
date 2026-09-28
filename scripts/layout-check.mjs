@@ -71,6 +71,34 @@ try {
     path: ".preview/smowaudio-options.png",
     fullPage: true,
   });
+  await page.evaluate(() => {
+    const previous = window.__TAURI_INTERNALS__.invoke;
+    window.__TAURI_INTERNALS__.invoke = async (cmd) =>
+      cmd === "inspect_video"
+        ? {
+            audioOnly: true,
+            title: "Audio source",
+            url: "https://soundcloud.com/artist/track",
+            formats: [{ vcodec: "none", acodec: "mp3" }],
+          }
+        : previous(cmd);
+  });
+  await page.getByRole("button", { name: "Get video" }).click();
+  await page.waitForFunction(
+    () => document.querySelector("#format").value === "m4a",
+  );
+  if (
+    !(await page.locator("#resolution").isDisabled()) ||
+    !(await page.locator("#codec").isDisabled())
+  )
+    throw Error("Audio source exposed video controls");
+  if (
+    !(await page
+      .locator('#format option[value="mp4"]')
+      .evaluate((option) => option.disabled))
+  )
+    throw Error("Audio source allowed MP4 output");
+  console.log("PASS: audio-only source automatically selects audio output");
   await page
     .getByRole("button", { name: "Browser helper", exact: true })
     .click();

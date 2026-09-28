@@ -16,12 +16,14 @@ async function send() {
     });
     const u = new URL(tab?.url || "");
     if (
-      u.protocol !== "https:" ||
-      !["youtube.com", "youtu.be", "tiktok.com", "instagram.com"].some(
-        (h) => u.hostname === h || u.hostname.endsWith("." + h),
-      )
+      !["http:", "https:"].includes(u.protocol) ||
+      !u.hostname ||
+      u.username ||
+      u.password
     )
-      throw Error("Open a YouTube, TikTok or Instagram video first.");
+      throw Error(
+        "Open an HTTP or HTTPS video or audio page first (without embedded login credentials).",
+      );
     const reply = await chrome.runtime.sendNativeMessage(
       "com.smowa.downloader",
       { url: u.href },

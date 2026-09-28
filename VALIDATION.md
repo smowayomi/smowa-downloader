@@ -27,3 +27,9 @@ The interface now uses Smowaudio's exact dark palette and native font stacks, 72
 Verified the user's saved ID matched the unpacked extension in Brave. A fresh isolated Brave profile could use the previous Chrome registration, so the original normal-profile failure was not reproduced. Pairing now explicitly registers Brave and Chrome in both registry views. The existing pairing was repaired without changing its ID. Popup v0.1.1 displays the exact native messaging error, specific recovery guidance and its own extension ID.
 
 `node scripts/brave-check.mjs` passed both cold app launch and reuse of a running single instance through real Brave native messaging. The test uses an isolated Brave profile and exercises the real popup button with a selected-video-tab fixture. It does not alter the user's browser profile. The user's installed extension must be reloaded to pick up updated popup code. Production builds and Clippy passed.
+
+## Broad yt-dlp website support
+
+Removed the three-domain allowlist from Rust validation (shared by the app and native bridge) and the extension. HTTP(S) media URLs, including custom ports and unknown domains, now reach yt-dlp's site-specific and generic extractors. Non-web schemes and embedded credentials remain rejected. Extension version: 0.1.2.
+
+Validation passed: Rust tests, Clippy, frontend/release builds; extension URL tests for Vimeo, Twitch, SoundCloud, Archive.org and generic links; audio-only UI fixture; real generic MP4 download through the native app (788,493 bytes); real generic MP3 metadata correctly detected as audio-only. The bundled engine lists 1,752 extractor entries, not distinct websites. Individual sites were not exhaustively tested. Support follows the installed engine, as in MeTube; DRM, authentication and playlist limitations still apply.

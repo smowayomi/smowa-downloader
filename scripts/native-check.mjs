@@ -39,13 +39,20 @@ async function bridge(url) {
   if (result.length < 4) throw Error("No native reply");
   return JSON.parse(result.subarray(4, 4 + result.readUInt32LE(0)).toString());
 }
-if ((await bridge("https://evil.example/")).ok)
+if ((await bridge("file:///unsupported")).ok)
   throw Error("Bridge allowed unsupported URL");
-if (!(await bridge("https://www.youtube.com/watch?v=jNQXAC9IVRw")).ok)
+if (
+  !(
+    await bridge(
+      process.env.SMOWA_TEST_URL ||
+        "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    )
+  ).ok
+)
   throw Error("Bridge did not open app");
 await page.locator("#options").waitFor({ state: "visible", timeout: 60000 });
 const title = await page.locator("#video-info h3").textContent();
-await page.locator("#resolution").selectOption("360");
+await page.locator("#resolution").selectOption("0");
 await page.screenshot({ path: ".preview/native-options.png", fullPage: true });
 const previousIds = new Set((await call("snapshot")).jobs.map((j) => j.id));
 await page.getByRole("button", { name: "Download", exact: true }).click();

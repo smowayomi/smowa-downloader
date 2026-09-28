@@ -2,16 +2,12 @@ use serde::{Deserialize, Serialize};
 
 pub fn validate_url(raw: &str) -> Result<String, String> {
     let u = url::Url::parse(raw.trim()).map_err(|_| "Enter a valid video URL".to_string())?;
-    let host = u.host_str().unwrap_or("");
-    if u.scheme() != "https"
-        || u.port().is_some()
+    if !["http", "https"].contains(&u.scheme())
+        || u.host_str().is_none()
         || !u.username().is_empty()
         || u.password().is_some()
-        || !["youtube.com", "youtu.be", "tiktok.com", "instagram.com"]
-            .iter()
-            .any(|h| host == *h || host.ends_with(&format!(".{h}")))
     {
-        return Err("Use an HTTPS YouTube, TikTok or Instagram link".into());
+        return Err("Use an HTTP or HTTPS media link without embedded login credentials".into());
     }
     Ok(u.into())
 }
@@ -129,18 +125,30 @@ mod tests {
         }
     }
     #[test]
-    fn rejects_untrusted_urls() {
+    fn validates_web_urls_without_a_site_allowlist() {
         for u in [
             "file:///x",
-            "https://youtube.com.evil.org/a",
-            "https://evil.org/?youtube.com",
-            "http://youtube.com/a",
-            "https://user@youtube.com/a",
-            "https://youtube.com:444/a",
+            "javascript:alert(1)",
+            "ftp://example.org/a",
+            "data:text/plain,test",
+            "https://user:pass@example.org/a",
+            "--exec calc.exe",
         ] {
             assert!(validate_url(u).is_err(), "{u}");
         }
-        assert!(validate_url("https://www.youtube.com/watch?v=x").is_ok());
+        for u in [
+            "https://vimeo.com/123",
+            "https://www.twitch.tv/videos/123",
+            "https://soundcloud.com/artist/track",
+            "https://archive.org/details/test",
+            "https://www.dailymotion.com/video/test",
+            "https://www.reddit.com/r/videos/comments/test",
+            "https://x.com/test/status/1",
+            "http://example.org:8080/video.mp4",
+            "https://example.org/embed",
+        ] {
+            assert!(validate_url(u).is_ok(), "{u}");
+        }
     }
     #[test]
     fn preserves_constraints() {

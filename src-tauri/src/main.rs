@@ -132,7 +132,7 @@ fn snapshot(state: State<Shared>) -> serde_json::Value {
 #[tauri::command]
 async fn inspect_video(url: String) -> Result<serde_json::Value, String> {
     let url = validate_url(&url)?;
-    tauri::async_runtime::spawn_blocking(move||{let out=command().args(["--dump-single-json","--skip-download","--",&url]).output().map_err(|e|format!("yt-dlp could not start. Run setup-tools.ps1. {e}"))?;if !out.status.success(){return Err(String::from_utf8_lossy(&out.stderr).chars().take(2500).collect());}let v:serde_json::Value=serde_json::from_slice(&out.stdout).map_err(|e|e.to_string())?;Ok(serde_json::json!({"title":v["title"],"thumbnail":v["thumbnail"],"duration":v["duration"],"uploader":v["uploader"],"formats":v["formats"],"url":url}))}).await.map_err(|e|e.to_string())?
+    tauri::async_runtime::spawn_blocking(move||{let out=command().args(["--dump-single-json","--skip-download","--",&url]).output().map_err(|e|format!("yt-dlp could not start. Run setup-tools.ps1. {e}"))?;if !out.status.success(){return Err(String::from_utf8_lossy(&out.stderr).chars().take(2500).collect());}let v:serde_json::Value=serde_json::from_slice(&out.stdout).map_err(|e|e.to_string())?;Ok(serde_json::json!({"title":v["title"],"thumbnail":v["thumbnail"],"duration":v["duration"],"uploader":v["uploader"],"formats":v["formats"],"audioOnly": v["vcodec"].as_str() == Some("none") || v["formats"].as_array().is_some_and(|fs| !fs.is_empty() && fs.iter().all(|f| f["vcodec"].as_str() == Some("none"))),"url":url}))}).await.map_err(|e|e.to_string())?
 }
 #[tauri::command]
 fn start_download(options: Options, title: String, state: State<Shared>) -> Result<String, String> {

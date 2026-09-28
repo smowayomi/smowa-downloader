@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Smowa — Send to desktop",
-  "version": "0.1.1",
-  "description": "Open the current YouTube, TikTok or Instagram video in Smowa.",
+  "version": "0.1.2",
+  "description": "Send video or audio pages from any yt-dlp-supported website to Smowa.",
   "permissions": ["activeTab", "nativeMessaging"],
   "action": {
     "default_title": "Download with Smowa",

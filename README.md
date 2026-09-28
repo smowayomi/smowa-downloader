@@ -1,6 +1,6 @@
 # Smowa
 
-A Windows video downloader with a Rust/Tauri desktop app and a Brave/Chrome helper. Paste a YouTube, TikTok or Instagram link, inspect the video, choose your settings and download. Inspired by MeTube's simple workflow.
+A Windows video downloader with a Rust/Tauri desktop app and a Brave/Chrome helper. Paste an HTTP(S) video or audio link from any yt-dlp-supported website, inspect the video, choose your settings and download. Inspired by MeTube's simple workflow.
 
 ## Run
 
@@ -51,6 +51,12 @@ Single videos only, no playlist handling, browser cookie import, login flow or D
 
 ## Architecture
 
-`src/` contains the TypeScript interface. `src-tauri/src/main.rs` owns the queue, process lifecycle, persistence, tray and desktop commands. `src-tauri/src/lib.rs` contains URL validation, download argument construction and progress parsing. `src-tauri/src/bin/bridge.rs` implements Chrome's length-prefixed native messaging protocol and starts the single-instance app. The bridge has no shell command interpolation; URLs are allowlisted and passed as individual arguments.
+`src/` contains the TypeScript interface. `src-tauri/src/main.rs` owns the queue, process lifecycle, persistence, tray and desktop commands. `src-tauri/src/lib.rs` contains URL validation, download argument construction and progress parsing. `src-tauri/src/bin/bridge.rs` implements Chrome's length-prefixed native messaging protocol and starts the single-instance app. The bridge has no shell command interpolation; URLs are restricted to HTTP(S) without embedded credentials and passed as individual arguments.
 
 References: [Tauri](https://v2.tauri.app/), [Chrome native messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging), [yt-dlp](https://github.com/yt-dlp/yt-dlp).
+
+## Supported websites
+
+Like [MeTube](https://github.com/alexta69/metube), Smowa uses [yt-dlp's supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md), rather than maintaining a separate website list. Examples include YouTube, Vimeo, Twitch, TikTok, Instagram, X/Twitter, Reddit, Dailymotion, Facebook, SoundCloud, Bandcamp and Internet Archive. Generic embedded media and direct HTTP(S) media links are attempted too. The app, native bridge and Brave/Chrome extension all accept these links without domain restrictions. Audio-only metadata selects an audio output format automatically.
+
+Actual availability follows the bundled yt-dlp version; a listed site is not a guarantee that every URL works. Login-required content, site restrictions, DRM and broken extractors remain limitations. Single-item downloads are supported; playlists and cookie import remain outside this version. Run Update tools.cmd to update yt-dlp.
