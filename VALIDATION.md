@@ -21,3 +21,9 @@ Reproducible browser check: run `npm run dev`, then `node scripts/ui-check.mjs`.
 The interface now uses Smowaudio's exact dark palette and native font stacks, 72 px navigation rail, compact top bar, neutral primary buttons and shared multicolor brand mark. The extension popup and Windows/tray icons follow the same styling.
 
 `node scripts/layout-check.mjs` exercises the actual loading transition with a delayed metadata fixture, checks 16 px inner bottom padding (17 px including the border) at 1180 px and 860 px, and captures idle, loading, loaded options and helper screens for visual review. Those checks and the production frontend/native release builds passed. The test fixture does not download a video or change user history.
+
+## Brave helper repair
+
+Verified the user's saved ID matched the unpacked extension in Brave. A fresh isolated Brave profile could use the previous Chrome registration, so the original normal-profile failure was not reproduced. Pairing now explicitly registers Brave and Chrome in both registry views. The existing pairing was repaired without changing its ID. Popup v0.1.1 displays the exact native messaging error, specific recovery guidance and its own extension ID.
+
+`node scripts/brave-check.mjs` passed both cold app launch and reuse of a running single instance through real Brave native messaging. The test uses an isolated Brave profile and exercises the real popup button with a selected-video-tab fixture. It does not alter the user's browser profile. The user's installed extension must be reloaded to pick up updated popup code. Production builds and Clippy passed.

@@ -379,7 +379,10 @@ async fn health() -> serde_json::Value {
 #[tauri::command]
 fn register_extension(extension_id: String, app: tauri::AppHandle) -> Result<(), String> {
     if extension_id.len() != 32 || !extension_id.bytes().all(|c| (b'a'..=b'p').contains(&c)) {
-        return Err("Enter the 32-letter extension ID from chrome://extensions".into());
+        return Err(
+            "Enter the 32-letter extension ID from brave://extensions or chrome://extensions"
+                .into(),
+        );
     }
     let exe = std::env::current_exe()
         .map_err(|e| e.to_string())?
@@ -394,26 +397,28 @@ fn register_extension(extension_id: String, app: tauri::AppHandle) -> Result<(),
         .join("native-host.json");
     let data = serde_json::json!({"name":"com.smowa.downloader","description":"Smowa desktop downloader","path":exe,"type":"stdio","allowed_origins":[format!("chrome-extension://{extension_id}/")]});
     std::fs::write(&path, serde_json::to_vec_pretty(&data).unwrap()).map_err(|e| e.to_string())?;
-    let status = hidden(
-        Command::new("reg")
-            .args([
-                "add",
-                r"HKCU\Software\Google\Chrome\NativeMessagingHosts\com.smowa.downloader",
-                "/ve",
-                "/t",
-                "REG_SZ",
-                "/d",
-            ])
-            .arg(path)
-            .arg("/f"),
-    )
-    .status()
-    .map_err(|e| e.to_string())?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err("Windows could not register the browser helper".into())
+    // Register explicitly for both browsers and both registry views. Brave can
+    // fall back to Chrome's registration, but should not have to depend on it.
+    for browser in [r"BraveSoftware\Brave-Browser", r"Google\Chrome"] {
+        for view in ["/reg:32", "/reg:64"] {
+            let key = format!(r"HKCU\Software\{browser}\NativeMessagingHosts\com.smowa.downloader");
+            let output = hidden(
+                Command::new("reg")
+                    .args(["add", &key, "/ve", "/t", "REG_SZ", "/d"])
+                    .arg(&path)
+                    .args(["/f", view]),
+            )
+            .output()
+            .map_err(|e| e.to_string())?;
+            if !output.status.success() {
+                return Err(format!(
+                    "Could not register {browser} ({view}): {}",
+                    String::from_utf8_lossy(&output.stderr)
+                ));
+            }
+        }
     }
+    Ok(())
 }
 fn main() {
     tauri::Builder::default()

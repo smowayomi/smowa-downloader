@@ -1,6 +1,6 @@
 # Smowa
 
-A Windows video downloader with a Rust/Tauri desktop app and a Chrome helper. Paste a YouTube, TikTok or Instagram link, inspect the video, choose your settings and download. Inspired by MeTube's simple workflow.
+A Windows video downloader with a Rust/Tauri desktop app and a Brave/Chrome helper. Paste a YouTube, TikTok or Instagram link, inspect the video, choose your settings and download. Inspired by MeTube's simple workflow.
 
 ## Run
 
@@ -8,14 +8,14 @@ Open `release/Smowa/smowa.exe`. Keep the complete folder together, including `to
 
 Closing the window hides Smowa in the system tray. Right-click its tray icon to open it or quit. Downloads continue while the window is hidden. Quitting stops running downloads. After an unexpected shutdown, interrupted jobs can be retried to resume partial downloads. Windows login autostart is not enabled.
 
-## Connect Chrome (one time)
+## Connect Brave or Chrome (one time)
 
-1. Go to `chrome://extensions` and enable **Developer mode**.
+1. Go to `brave://extensions` (or `chrome://extensions` in Chrome) and enable **Developer mode**.
 2. Choose **Load unpacked** and select `release/Smowa/extension`.
 3. Copy the extension ID, open **Browser helper** in Smowa, paste it and click **Connect helper**.
-4. Pin the extension. On a video page, click Smowa to open the app with that video's options.
+4. After an update, click **Reload** on the extension card, then pin the extension. On a video page, click Smowa to open the app with that video's options.
 
-Pairing registers a native messaging host for the current Windows user only. No administrator rights, listening web server or all-sites permission is needed. Moving the app folder requires pairing again. To unregister, remove `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.smowa.downloader` and remove the extension in Chrome.
+Pairing registers a native messaging host explicitly for Brave and Chrome in both Windows registry views, for the current Windows user only. No administrator rights, listening web server or all-sites permission is needed. Moving the app folder requires pairing again. To unregister, remove `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.smowa.downloader` and `HKCU\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\com.smowa.downloader` (both registry views) and remove the extension in Chrome.
 
 ## Features and behavior
 

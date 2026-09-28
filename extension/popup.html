@@ -35,6 +35,28 @@
         outline: 2px solid #6cc0f2;
         outline-offset: 3px;
       }
+      button:disabled {
+        opacity: 0.55;
+        cursor: default;
+      }
+      #details {
+        color: #ffb4b5;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+      .pairing {
+        border-top: 1px solid #2b303a;
+        margin-top: 16px;
+        padding-top: 12px;
+        color: #a1a7b2;
+        font-size: 11px;
+      }
+      code {
+        display: block;
+        margin-top: 5px;
+        color: #e9e6df;
+        user-select: all;
+      }
     </style>
   </head>
   <body>
@@ -43,6 +65,10 @@
       Send this video to your desktop to choose quality and download.
     </p>
     <button id="send">Open in Smowa</button>
+    <p id="details" role="alert"></p>
+    <div class="pairing">
+      Extension ID � Brave / Chrome<code id="extension-id"></code>
+    </div>
     <script src="popup.js"></script>
   </body>
 </html>
