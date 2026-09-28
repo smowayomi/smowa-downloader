@@ -146,20 +146,20 @@ async fn run_inner(app: &tauri::AppHandle, force: bool, install: bool) -> Result
         .and_then(|w| w.is_visible().ok())
         .unwrap_or(true);
     let enabled = state.0.lock().unwrap().status.enabled;
-    if !install && (force || visible || !enabled) {
+    if !may_install(install, enabled, force, visible, false) {
         return Ok(());
     }
     let shared = app.state::<Shared>();
     {
         let mut downloads = shared.0.lock().unwrap();
-        if !downloads.processes.is_empty()
+        let busy = !downloads.processes.is_empty()
             || !downloads.pending.is_empty()
             || downloads
                 .jobs
                 .iter()
                 .any(|j| ["queued", "downloading", "processing"].contains(&j.status.as_str()))
-            || crate::engine::is_busy(app)
-        {
+            || crate::engine::is_busy(app);
+        if !may_install(install, enabled, force, visible, busy) {
             state.0.lock().unwrap().status.message =
                 "Update ready. Waiting for downloads to finish.".into();
             return Ok(());
@@ -183,4 +183,21 @@ async fn run_inner(app: &tauri::AppHandle, force: bool, install: bool) -> Result
         state.0.lock().unwrap().pending = Some(pending);
     }
     result
+}
+
+fn may_install(manual: bool, enabled: bool, check_only: bool, visible: bool, busy: bool) -> bool {
+    !busy && (manual || (enabled && !check_only && !visible))
+}
+#[cfg(test)]
+mod tests {
+    use super::may_install;
+    #[test]
+    fn updates_never_interrupt_work_or_visible_windows() {
+        assert!(!may_install(true, true, false, false, true));
+        assert!(!may_install(false, true, false, true, false));
+        assert!(!may_install(false, false, false, false, false));
+        assert!(!may_install(false, true, true, false, false));
+        assert!(may_install(false, true, false, false, false));
+        assert!(may_install(true, false, false, true, false));
+    }
 }

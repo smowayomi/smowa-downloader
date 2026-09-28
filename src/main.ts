@@ -324,7 +324,9 @@ function updateFormat() {
   $<HTMLSelectElement>("codec").disabled = audio;
   $("quality-hint").textContent = audio
     ? "Audio is extracted and converted with FFmpeg. Quality controls the audio encoding."
-    : "Original streams, no video re-encoding. Resolution is a maximum; availability depends on the video.";
+    : $<HTMLInputElement>("clip-enabled").checked
+      ? "Exact section cuts may re-encode video. Resolution and codec select the source streams."
+      : "Original streams, no video re-encoding. Resolution is a maximum; availability depends on the video.";
 }
 $("format").onchange = updateFormat;
 function parseTimestamp(value: string): number {
@@ -334,7 +336,7 @@ function parseTimestamp(value: string): number {
   if (!Number.isFinite(seconds)) throw Error("Invalid timestamp.");
   return seconds;
 }
-$("clip-enabled").onchange = () => { $("clip-fields").hidden = !$<HTMLInputElement>("clip-enabled").checked; };
+$("clip-enabled").onchange = () => { $("clip-fields").hidden = !$<HTMLInputElement>("clip-enabled").checked; updateFormat(); };
 $("download").onclick = async () => {
   if (!video || busy) return;
   busy = true;
