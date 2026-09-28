@@ -1,10 +1,10 @@
-# Smowa
+# SmowaDL
 
 A Windows video downloader with a Rust/Tauri desktop app and a Brave/Chrome helper. Paste an HTTP(S) video or audio link from any yt-dlp-supported website, inspect the video, choose your settings and download. Inspired by MeTube's simple workflow.
 
 ## Run
 
-Open `release/Smowa/smowa.exe`. Keep the complete folder together, including `tools`, `extension`, and `smowa-bridge.exe`. Windows WebView2 is required (included on modern Windows 11 installations).
+Open `release/Smowa/SmowaDL.exe`. Keep the complete folder together, including `tools`, `extension`, and `smowa-bridge.exe`. Windows WebView2 is required (included on modern Windows 11 installations).
 
 Closing the window hides Smowa in the system tray. Right-click its tray icon to open it or quit. Downloads continue while the window is hidden. Quitting stops running downloads. After an unexpected shutdown, interrupted jobs can be retried to resume partial downloads. Windows login autostart is not enabled.
 
@@ -12,10 +12,14 @@ Closing the window hides Smowa in the system tray. Right-click its tray icon to 
 
 1. Go to `brave://extensions` (or `chrome://extensions` in Chrome) and enable **Developer mode**.
 2. Choose **Load unpacked** and select `release/Smowa/extension`.
-3. Copy the extension ID, open **Browser helper** in Smowa, paste it and click **Connect helper**.
-4. After an update, click **Reload** on the extension card, then pin the extension. On a video page, click Smowa to open the app with that video's options.
+3. Run **SmowaDL.exe** once to register its Windows app link.
+4. After an update, click **Reload** on the extension card and refresh open media pages. Click **Open in SmowaDL** in the popup, or the small download arrow on supported media. Allow Brave to open SmowaDL if prompted.
 
-Pairing registers a native messaging host explicitly for Brave and Chrome in both Windows registry views, for the current Windows user only. No administrator rights, listening web server or all-sites permission is needed. Moving the app folder requires pairing again. To unregister, remove `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.smowa.downloader` and `HKCU\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\com.smowa.downloader` (both registry views) and remove the extension in Chrome.
+The extension uses `smowadl://` Windows app links, independent of native messaging host lookup. The app validates the enclosed HTTP(S) URL and opens download options; it does not download automatically. Run the app again if you move its folder. The installed extension folder remains `release/Smowa/extension` to preserve its ID. Legacy native messaging pairing remains available for older extensions.
+
+Small media buttons are provided on recognizable YouTube, Instagram, X/Twitter and TikTok video containers. Ambiguous feed items are skipped; the toolbar popup remains available. Site layouts can change. Controls are keyboard accessible and hidden in fullscreen.
+
+To remove the app-link registration, remove `HKCU\Software\Classes\smowadl`. Older native registrations may also be removed from the Brave and Chrome `NativeMessagingHosts\com.smowa.downloader` keys.
 
 ## Features and behavior
 
@@ -61,6 +65,8 @@ Like [MeTube](https://github.com/alexta69/metube), Smowa uses [yt-dlp's supporte
 
 Actual availability follows the bundled yt-dlp version; a listed site is not a guarantee that every URL works. Login-required content, site restrictions, DRM and broken extractors remain limitations. Single-item downloads are supported; playlists and cookie import remain outside this version. Run Update tools.cmd to update yt-dlp.
 
-### Already paired, but the host is not found
+### Browser connection troubleshooting
 
-Save unfinished browser work, use the browser menu to **Exit** completely, then open Brave or Chrome again. Reloading the extension or using the browser restart page may not resolve this. Keep the app folder in the location used for pairing. If the error persists, the extension displays the exact native-messaging error and its ID for diagnosis.
+Version 0.2.0 of the extension no longer uses native messaging for downloads. If you still see “Specified native messaging host not found”, reload the extension at `brave://extensions`: that message comes from the older popup. Confirm the extension version is 0.2.0. Open SmowaDL.exe once, click the popup link, and accept Brave's external-app prompt. No extension ID pairing is needed for the new handoff.
+
+The previous native messaging failure was reproducible in the normal Brave profile but not isolated tests. Its underlying cause is unresolved; app links avoid that lookup entirely.

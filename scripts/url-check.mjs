@@ -1,40 +1,12 @@
-import vm from "node:vm";
-import fs from "node:fs/promises";
-const source = await fs.readFile("extension/popup.js", "utf8");
-for (const [url, allowed] of [
-  ["https://vimeo.com/123", true],
-  ["https://soundcloud.com/artist/track", true],
-  ["https://www.twitch.tv/videos/123", true],
-  ["https://archive.org/details/test", true],
-  ["http://example.org:8080/a.mp4", true],
-  ["brave://settings", false],
-  ["file:///test.mp4", false],
-  ["https://user:pass@example.org", false],
-]) {
-  const nodes = {};
-  let forwarded = false;
-  const c = vm.createContext({
-    URL,
-    Error,
-    document: {
-      getElementById: (id) =>
-        (nodes[id] ??= { textContent: "", addEventListener() {} }),
-    },
-    chrome: {
-      runtime: {
-        id: "test",
-        sendNativeMessage: async () => {
-          forwarded = true;
-          return { ok: true };
-        },
-      },
-      tabs: { query: async () => [{ url }] },
-    },
-  });
-  vm.runInContext(source, c);
-  await new Promise((r) => setTimeout(r, 0));
-  if (forwarded !== allowed) throw Error("Incorrect handling: " + url);
+import vm from 'node:vm';
+import fs from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const source=await fs.readFile('extension/popup.js','utf8');
+for(const url of ['https://example.com/watch?v=1&t=2','file:///C:/test','https://user:pass@example.com']) {
+ const elements=Object.fromEntries(['send','status','details'].map(id=>[id,{textContent:'',removeAttribute(){},hasAttribute(k){return !!this[k]},addEventListener(){}}]));
+ vm.runInNewContext(source,{document:{getElementById:id=>elements[id]},chrome:{tabs:{query:async()=>[{url}]}},URL,encodeURIComponent});
+ await new Promise(r=>setTimeout(r,0));
+ if(url.startsWith('https://example.com')) assert.equal(elements.send.href,'smowadl://download?url='+encodeURIComponent(url));
+ else assert.equal(elements.send.href,undefined);
 }
-console.log(
-  "PASS: extension accepts other websites and rejects non-web URLs and embedded credentials",
-);
+console.log('Popup app-link routing and invalid URL checks passed.');

@@ -176,3 +176,40 @@ mod tests {
         assert!(progress("SMOWA_PROGRESS:NaN|x|y").is_none());
     }
 }
+
+/// Decode only our explicit download route; never accept executable arguments.
+pub fn parse_app_link(raw: &str) -> Result<String, String> {
+    let u = url::Url::parse(raw).map_err(|_| "Invalid app link")?;
+    if u.scheme() != "smowadl"
+        || u.host_str() != Some("download")
+        || !["", "/"].contains(&u.path())
+        || !u.username().is_empty()
+        || u.password().is_some()
+        || u.port().is_some()
+        || u.fragment().is_some()
+    {
+        return Err("Invalid app link".into());
+    }
+    let pairs: Vec<_> = u.query_pairs().collect();
+    if pairs.len() != 1 || pairs[0].0 != "url" {
+        return Err("Invalid app link parameters".into());
+    }
+    validate_url(&pairs[0].1)
+}
+#[test]
+fn app_links_validate_and_preserve_media_urls() {
+    assert_eq!(
+        parse_app_link("smowadl://download?url=https%3A%2F%2Fexample.com%2Fwatch%3Fv%3D1%26t%3D2")
+            .unwrap(),
+        "https://example.com/watch?v=1&t=2"
+    );
+    for bad in [
+        "smowadl://download?url=file%3A%2F%2Fc%3A%2Ftest",
+        "smowadl://other?url=https://example.com",
+        "smowadl://download?url=https://example.com&url=https://other.com",
+        "smowadl://download?url=https://user:pass@example.com",
+        "smowadl://download?url=https://example.com&args=--exec",
+    ] {
+        assert!(parse_app_link(bad).is_err(), "{bad}");
+    }
+}

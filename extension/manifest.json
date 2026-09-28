@@ -1,11 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Smowa \u00e2\u20ac\u201d Send to desktop",
-  "version": "0.1.3",
-  "description": "Send video or audio pages from any yt-dlp-supported website to Smowa.",
-  "permissions": ["activeTab", "nativeMessaging"],
+  "name": "SmowaDL - Send to desktop",
+  "version": "0.2.0",
+  "description": "Open video and audio in SmowaDL to choose quality and download.",
+  "permissions": [
+    "activeTab",
+    "nativeMessaging"
+  ],
   "action": {
-    "default_title": "Download with Smowa",
+    "default_title": "Download with SmowaDL",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -17,5 +20,20 @@
     "32": "icons/icon-32.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.instagram.com/*",
+        "*://*.x.com/*",
+        "*://*.twitter.com/*",
+        "*://*.tiktok.com/*"
+      ],
+      "js": [
+        "media-buttons.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
 }

@@ -115,12 +115,13 @@ fn show(app: &tauri::AppHandle) {
     }
 }
 fn receive(app: &tauri::AppHandle, args: Vec<String>) {
-    if let Some(i) = args.iter().position(|a| a == "--url") {
-        if let Some(raw) = args.get(i + 1) {
-            if let Ok(url) = validate_url(raw) {
-                app.state::<Shared>().0.lock().unwrap().pending.push(url);
-            }
-        }
+    let incoming = args.windows(2).find_map(|pair| match pair[0].as_str() {
+        "--url" => Some(validate_url(&pair[1])),
+        "--open-link" => Some(smowa::parse_app_link(&pair[1])),
+        _ => None,
+    });
+    if let Some(Ok(url)) = incoming {
+        app.state::<Shared>().0.lock().unwrap().pending.push(url);
     }
     show(app);
 }
@@ -395,7 +396,7 @@ fn register_extension(extension_id: String, app: tauri::AppHandle) -> Result<(),
         .app_data_dir()
         .map_err(|e| e.to_string())?
         .join("native-host.json");
-    let data = serde_json::json!({"name":"com.smowa.downloader","description":"Smowa desktop downloader","path":exe,"type":"stdio","allowed_origins":[format!("chrome-extension://{extension_id}/")]});
+    let data = serde_json::json!({"name":"com.smowa.downloader","description":"SmowaDL desktop downloader","path":exe,"type":"stdio","allowed_origins":[format!("chrome-extension://{extension_id}/")]});
     std::fs::write(&path, serde_json::to_vec_pretty(&data).unwrap()).map_err(|e| e.to_string())?;
     // Register explicitly for both browsers and both registry views. Brave can
     // fall back to Chrome's registration, but should not have to depend on it.
@@ -420,6 +421,34 @@ fn register_extension(extension_id: String, app: tauri::AppHandle) -> Result<(),
     }
     Ok(())
 }
+fn register_app_link() -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let command = format!("\"{}\" --open-link \"%1\"", exe.display());
+    for (key, name, value) in [
+        (r"HKCU\Software\Classes\smowadl", "/ve", "URL:SmowaDL"),
+        (r"HKCU\Software\Classes\smowadl", "URL Protocol", ""),
+        (
+            r"HKCU\Software\Classes\smowadl\shell\open\command",
+            "/ve",
+            command.as_str(),
+        ),
+    ] {
+        let mut cmd = Command::new("reg");
+        cmd.args(["add", key]);
+        if name == "/ve" {
+            cmd.arg("/ve");
+        } else {
+            cmd.args(["/v", name]);
+        }
+        let output = hidden(cmd.args(["/t", "REG_SZ", "/d", value, "/f"]))
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Err(String::from_utf8_lossy(&output.stderr).into_owned());
+        }
+    }
+    Ok(())
+}
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
@@ -439,6 +468,7 @@ fn main() {
             register_extension
         ])
         .setup(|app| {
+            register_app_link().map_err(std::io::Error::other)?;
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
             let history = dir.join("history.json");
@@ -451,7 +481,7 @@ fn main() {
                 if ["queued", "downloading", "processing"].contains(&j.status.as_str()) {
                     j.status = "interrupted".into();
                     j.error =
-                        "Smowa closed before this download finished. Retry to resume partial data."
+                        "SmowaDL closed before this download finished. Retry to resume partial data."
                             .into();
                 }
             }
@@ -481,11 +511,11 @@ fn main() {
                     std::thread::sleep(std::time::Duration::from_millis(300));
                 }
             });
-            let open = MenuItem::with_id(app, "open", "Open Smowa", true, None::<&str>)?;
+            let open = MenuItem::with_id(app, "open", "Open SmowaDL", true, None::<&str>)?;
             let quit = MenuItem::with_id(
                 app,
                 "quit",
-                "Quit Smowa (stops downloads)",
+                "Quit SmowaDL (stops downloads)",
                 true,
                 None::<&str>,
             )?;
@@ -493,7 +523,7 @@ fn main() {
             let rgba = include_bytes!("../icons/tray.rgba").to_vec();
             TrayIconBuilder::new()
                 .icon(tauri::image::Image::new_owned(rgba, 32, 32))
-                .tooltip("Smowa — running in the background")
+                .tooltip("SmowaDL — running in the background")
                 .menu(&menu)
                 .on_menu_event(|app, e| {
                     if e.id.as_ref() == "open" {
@@ -524,5 +554,5 @@ fn main() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("Could not launch Smowa");
+        .expect("Could not launch SmowaDL");
 }

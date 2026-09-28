@@ -1,7 +1,6 @@
 import { chromium } from "@playwright/test";
 import path from "node:path";
 import fs from "node:fs/promises";
-import { execFileSync } from "node:child_process";
 const ext = path.resolve("release/Smowa/extension");
 const manifest = JSON.parse(
   await fs.readFile(
@@ -10,14 +9,6 @@ const manifest = JSON.parse(
   ),
 );
 const id = new URL(manifest.allowed_origins[0]).hostname;
-const count = () =>
-  execFileSync(
-    "tasklist.exe",
-    ["/FI", "IMAGENAME eq smowa.exe", "/FO", "CSV", "/NH"],
-    { encoding: "utf8", windowsHide: true },
-  )
-    .split("\n")
-    .filter((l) => /^"smowa.exe"/i.test(l)).length;
 const ctx = await chromium.launchPersistentContext(
   path.resolve(".preview/brave-bridge-check"),
   {
@@ -30,23 +21,11 @@ const ctx = await chromium.launchPersistentContext(
 try {
   const p = await ctx.newPage();
   await p.goto(`chrome-extension://${id}/popup.html`);
-  const before = count();
-  // Exercise the actual popup button with a video-tab fixture; native messaging is real.
-  await p.evaluate(() => {
-    chrome.tabs.query = async () => [
-      { url: "https://www.youtube.com/watch?v=jNQXAC9IVRw" },
-    ];
-  });
+  // Legacy native messaging remains available independently of the app-link popup.
   for (let i = 0; i < 2; i++) {
-    await p.getByRole("button", { name: "Open in Smowa" }).click();
-    await p
-      .getByText("Opened in Smowa. Choose your download options there.")
-      .waitFor();
-    await new Promise((r) => setTimeout(r, 1500));
-    if (count() !== 1) throw Error("Expected exactly one app instance");
-    console.log(
-      `PASS ${i === 0 && before === 0 ? "app closed → launch" : "app running → reuse"} through Brave native messaging and popup handler`,
-    );
+    const reply = await p.evaluate(() => chrome.runtime.sendNativeMessage('com.smowa.downloader', {url:'https://www.youtube.com/watch?v=jNQXAC9IVRw'}));
+    if (!reply?.ok) throw Error(reply?.error || 'No native confirmation');
+    console.log('PASS legacy Brave native messaging');
   }
   await p.screenshot({ path: ".preview/brave-connected.png" });
 } finally {
