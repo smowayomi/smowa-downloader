@@ -44,14 +44,14 @@ try {
     .fill("https://www.youtube.com/watch?v=test");
   await page.getByRole("button", { name: "Get video" }).click();
   await page.getByRole("button", { name: "Getting video…" }).waitFor();
-  for (const width of [1180, 860]) {
+  for (const width of [1180, 880, 760, 640]) {
     await page.setViewportSize({ width, height: 820 });
     const gap = await page.evaluate(
       () =>
         document.querySelector(".composer").getBoundingClientRect().bottom -
         document.querySelector("#analyze-form").getBoundingClientRect().bottom,
     );
-    if (gap < 16) throw Error("Loading bottom padding regressed: " + gap);
+    if (gap < 12) throw Error("Loading bottom padding regressed: " + gap);
     if (
       await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth,
@@ -71,6 +71,17 @@ try {
     path: ".preview/smowaudio-options.png",
     fullPage: true,
   });
+  for (const [width, height] of [[880, 620], [640, 480]]) {
+    await page.setViewportSize({width, height});
+    if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw Error('Compact layout overflows');
+    const download = page.locator('.destination .primary');
+    await download.scrollIntoViewIfNeeded();
+    if (!(await download.isVisible())) throw Error('Download action inaccessible');
+    await page.evaluate(() => scrollTo(0, 0));
+    if (width === 880 && (await download.boundingBox()).y + (await download.boundingBox()).height > height) throw Error('Default size requires scrolling to download');
+    await page.screenshot({path: `.preview/compact-${width}.png`, fullPage: true});
+    console.log(`PASS compact loaded layout ${width}x${height}`);
+  }
   await page.evaluate(() => {
     const previous = window.__TAURI_INTERNALS__.invoke;
     window.__TAURI_INTERNALS__.invoke = async (cmd) =>

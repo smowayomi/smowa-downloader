@@ -73,8 +73,8 @@ svg {
 aside {
   position: fixed;
   inset: 0 auto 0 0;
-  width: 72px;
-  padding: 10px 6px;
+  width: 60px;
+  padding: 8px 4px;
   display: flex;
   flex-direction: column;
   background: var(--window);
@@ -85,15 +85,15 @@ aside {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  min-height: 57px;
+  min-height: 48px;
   width: 100%;
-  padding: 9px 2px;
+  padding: 6px 2px;
   margin-bottom: 4px;
   border: 0;
   border-radius: 8px;
   background: none;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
 }
 .nav svg {
   width: 20px;
@@ -109,7 +109,7 @@ aside {
   margin-top: auto;
 }
 main {
-  margin-left: 72px;
+  margin-left: 60px;
   min-width: 0;
   flex: 1;
   display: flex;
@@ -120,12 +120,12 @@ header {
   position: sticky;
   top: 0;
   z-index: 5;
-  min-height: 46px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 20px;
+  padding: 6px 14px;
   background: var(--window);
   border-bottom: 1px solid var(--line);
 }
@@ -175,7 +175,7 @@ header {
   flex: none;
 }
 .content {
-  padding: 18px 20px 24px;
+  padding: 12px 14px 16px;
   width: 100%;
   flex: 1;
   min-width: 0;
@@ -184,12 +184,12 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -226,7 +226,7 @@ button.primary {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 16px;
+  padding: 12px;
   min-width: 0;
 }
 .composer-top {
@@ -234,7 +234,7 @@ button.primary {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .section-label {
   display: flex;
@@ -308,7 +308,7 @@ input::placeholder {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 22px 0 12px;
+  margin: 14px 0 8px;
 }
 .list-heading h2 {
   display: flex;
@@ -330,26 +330,26 @@ input::placeholder {
   color: var(--muted);
 }
 .empty-state {
-  min-height: 190px;
+  min-height: 110px;
   border: 1px dashed var(--line);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 14px;
   text-align: center;
   background: var(--panel);
 }
 .empty-icon {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   background: var(--raised);
   border-radius: 6px;
   color: var(--muted);
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 .empty-state h3 {
   font-size: 14px;
@@ -362,7 +362,7 @@ input::placeholder {
 .empty-tags {
   display: flex;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 8px;
 }
 .empty-tags span {
   font: 11px var(--font-label);
@@ -376,7 +376,7 @@ input::placeholder {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 10px;
   color: var(--muted);
 }
 .tip > span {
@@ -394,8 +394,8 @@ footer {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin: 0 20px;
-  padding: 10px 0;
+  margin: 0 14px;
+  padding: 6px 0;
   border-top: 1px solid var(--line);
   font-size: 11px;
   color: var(--muted);
@@ -408,15 +408,15 @@ footer .status-dot {
 #video-info {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   border-top: 1px solid var(--line);
-  padding: 16px 0;
-  margin-top: 16px;
+  padding: 10px 0;
+  margin-top: 10px;
 }
 #video-info img,
 .video-placeholder {
-  width: 128px;
-  height: 74px;
+  width: 96px;
+  height: 54px;
   object-fit: cover;
   border-radius: 5px;
   background: var(--well);
@@ -425,9 +425,9 @@ footer .status-dot {
   min-width: 0;
 }
 #video-info h3 {
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.4;
-  margin: 5px 0;
+  margin: 3px 0;
   overflow-wrap: anywhere;
 }
 #video-info p {
@@ -436,7 +436,7 @@ footer .status-dot {
 .option-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 label {
   display: flex;
@@ -454,17 +454,17 @@ select:disabled {
 }
 .hint {
   font-size: 12px;
-  margin: 10px 0 14px;
+  margin: 7px 0 9px;
   color: var(--muted);
 }
 .destination {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
   border-top: 1px solid var(--line);
-  padding-top: 14px;
-  margin-top: 14px;
+  padding-top: 10px;
+  margin-top: 10px;
 }
 .folder-button {
   justify-content: flex-start;
@@ -472,7 +472,7 @@ select:disabled {
   text-align: left;
   background: var(--raised);
   border: 1px solid var(--line);
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-radius: 6px;
   color: var(--text);
 }
@@ -500,12 +500,12 @@ select:disabled {
 .job {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 14px;
+  gap: 8px;
+  padding: 10px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .job-icon {
   display: grid;
@@ -632,8 +632,8 @@ pre {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
+  padding: 12px;
+  margin-bottom: 12px;
 }
 .setup-card h2 {
   font-size: 16px;
@@ -690,7 +690,7 @@ code {
 .toast {
   position: fixed;
   bottom: 24px;
-  left: calc(50% + 36px);
+  left: calc(50% + 30px);
   transform: translateX(-50%);
   padding: 12px 18px;
   background: var(--raised);
@@ -727,94 +727,26 @@ code {
   white-space: nowrap;
   border: 0;
 }
-@media (max-width: 1000px) {
-  .option-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  #folder-label {
-    max-width: 330px;
-  }
+/* Keep the download form in one row at the default desktop size. */
+@media (max-width: 900px) {
+  .platforms, .header-status .pill:first-child, .brand-detail { display: none; }
+  .page-heading > div > p { max-width: 44ch; }
+  #folder-label { max-width: 340px; }
+  .empty-tags { display: none; }
 }
-@media (max-width: 700px) {
-  header {
-    padding: 10px 14px;
-  }
-  .content {
-    padding: 16px 14px;
-  }
-  .header-status .pill:first-child,
-  .brand-detail {
-    display: none;
-  }
-  .page-heading {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  .platforms {
-    display: none;
-  }
-  .composer {
-    padding: 14px;
-  }
-  .url-row {
-    flex-wrap: wrap;
-  }
-  .url-row input {
-    flex-basis: 100%;
-  }
-  .list-heading > span {
-    display: none;
-  }
-  .empty-tags {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .destination {
-    flex-wrap: wrap;
-  }
-  .job {
-    padding: 12px;
-    gap: 8px;
-  }
-  .job-icon {
-    display: none;
-  }
-  .job-top {
-    align-items: flex-start;
-  }
-  .job-meta {
-    gap: 5px;
-  }
-  .option-grid {
-    grid-template-columns: 1fr;
-  }
-  #folder-label {
-    max-width: 190px;
-  }
-  .toast {
-    left: 85px;
-    right: 14px;
-    transform: none;
-  }
-  footer {
-    margin: 0 14px;
-  }
-  footer > span:last-child {
-    display: none;
-  }
-  .brand {
-    font-size: 13px;
-  }
-  .header-status {
-    gap: 6px;
-  }
-  #video-info {
-    align-items: flex-start;
-  }
-  #video-info img {
-    width: 90px;
-    height: 60px;
-  }
+@media (max-width: 760px) {
+  .option-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .page-heading { align-items: center; }
+  .page-heading > div > p, .list-heading > span { display: none; }
+  .content { padding: 10px; }
+  .job-icon { display: none; }
+  #folder-label { max-width: 260px; }
+  .toast { left: 70px; right: 10px; transform: none; }
+  footer > span:last-child { display: none; }
+}
+@media (max-height: 650px) {
+  .empty-state { min-height: 76px; padding: 10px; }
+  .empty-icon, .empty-tags, .tip { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   * {
