@@ -3155,6 +3155,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "url",
  "uuid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -332,6 +332,37 @@ fn clear_history(state: State<Shared>) {
         .retain(|j| ["queued", "downloading", "processing"].contains(&j.status.as_str()));
     save(&mut d);
 }
+fn open_folder(folder: &std::path::Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::{
+        System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED},
+        UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL},
+    };
+    let path: Vec<u16> = folder.as_os_str().encode_wide().chain(Some(0)).collect();
+    // The null verb asks Windows for the user's default folder action.
+    // Buffers remain alive for the call; no command-line interpolation is involved.
+    let result = unsafe {
+        let initialized = CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED as u32);
+        let result = ShellExecuteW(
+            std::ptr::null_mut(),
+            std::ptr::null(),
+            path.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            SW_SHOWNORMAL,
+        ) as isize;
+        if initialized >= 0 {
+            CoUninitialize();
+        }
+        result
+    };
+    if result <= 32 {
+        return Err(format!(
+            "Windows could not open the download folder (error {result})"
+        ));
+    }
+    Ok(())
+}
 #[tauri::command]
 fn reveal(id: String, state: State<Shared>) -> Result<(), String> {
     let d = state.0.lock().unwrap();
@@ -344,10 +375,9 @@ fn reveal(id: String, state: State<Shared>) -> Result<(), String> {
     if j.status != "completed" || !p.is_file() {
         return Err("The downloaded file is no longer at its original location".into());
     }
-    Command::new("explorer.exe")
-        .arg(format!("/select,{}", p.display()))
-        .spawn()
-        .map_err(|e| e.to_string())?;
+    let folder = p.parent().ok_or("Download folder not found")?.to_path_buf();
+    drop(d);
+    open_folder(&folder)?;
     Ok(())
 }
 #[tauri::command]

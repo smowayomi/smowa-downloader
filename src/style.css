@@ -525,6 +525,7 @@ select:disabled {
   min-width: 0;
 }
 .job-top {
+  min-height: 30px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -539,6 +540,12 @@ select:disabled {
   white-space: nowrap;
 }
 .job-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 22px;
+  white-space: nowrap;
   font: 11px var(--font-label);
   letter-spacing: 0.04em;
   text-transform: uppercase;

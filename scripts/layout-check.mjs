@@ -43,7 +43,7 @@ try {
     .getByRole("textbox", { name: "Video URL", exact: true })
     .fill("https://www.youtube.com/watch?v=test");
   await page.getByRole("button", { name: "Get video" }).click();
-  await page.getByRole("button", { name: "Getting video…" }).waitFor();
+  await page.waitForFunction(() => document.querySelector("#analyze").disabled);
   for (const width of [1180, 880, 760, 640]) {
     await page.setViewportSize({ width, height: 820 });
     const gap = await page.evaluate(
@@ -101,6 +101,13 @@ try {
   await page.evaluate(() => { window.testJobs[0].status = 'completed'; window.testJobs[0].percent = 100; });
   await page.getByRole('button', {name:'Show in folder', exact:true}).waitFor();
   if (await page.locator('#history-list .job').count() !== 1) throw Error('Job lost or duplicated on completion');
+  const alignment = await page.locator('#history-list .job').evaluate(row => {
+    const badge = row.querySelector('.job-status').getBoundingClientRect();
+    const button = row.querySelector('.icon-button').getBoundingClientRect();
+    return Math.abs((badge.y + badge.height / 2) - (button.y + button.height / 2));
+  });
+  if (alignment > 1) throw Error(`Status and action misaligned by ${alignment}px`);
+  await page.screenshot({path:'.preview/completed-alignment.png', fullPage:true});
   console.log('PASS queued download appears immediately and remains after completion');
   await page.evaluate(() => {
     const previous = window.__TAURI_INTERNALS__.invoke;
