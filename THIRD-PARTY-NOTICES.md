@@ -1,11 +1,11 @@
 # Third-party components
 
-This local development build uses Tauri (MIT / Apache-2.0), Lucide (ISC), Vite (MIT), TypeScript (Apache-2.0), and their dependencies. Refer to the lockfiles and upstream repositories for exact versions and full notices.
+SmowaDL uses Tauri and plugins (MIT / Apache-2.0), Lucide (ISC), Vite (MIT), TypeScript (Apache-2.0) and dependencies recorded in the lockfiles.
 
-The portable folder may include these independently licensed executables:
+Public installers do not redistribute media-engine executables. First-run setup downloads these separately, verifies upstream SHA-256 checksums and retains supplied notices where available:
 
-- yt-dlp Windows executable: https://github.com/yt-dlp/yt-dlp — Windows release includes GPLv3+ components. Release and source: https://github.com/yt-dlp/yt-dlp/releases
-- FFmpeg / FFprobe: https://ffmpeg.org/legal.html — licensing depends on the installed build configuration. Run `tools/ffmpeg.exe -L` and `-buildconf` to inspect this build. Obtain corresponding source and comply with the build's license before redistributing.
-- Node.js: https://github.com/nodejs/node/blob/main/LICENSE — MIT and third-party components. Sources: https://nodejs.org/en/download
+- yt-dlp: https://github.com/yt-dlp/yt-dlp — Windows releases include GPLv3+ components. Sources and notices: https://github.com/yt-dlp/yt-dlp/releases
+- FFmpeg / FFprobe: https://www.gyan.dev/ffmpeg/builds/ — GPLv3 essentials builds. The upstream page links sources and build information. License and README files are retained alongside the tools.
+- Node.js: https://nodejs.org — MIT and third-party components; the distribution LICENSE is retained alongside node.exe.
 
-This folder is prepared for local use. Review and include all required license texts and corresponding source offers before public redistribution.
+Local portable development packaging can copy independently installed tools. Review the licenses and source requirements of those exact builds before redistributing that folder. Public releases use the installer workflow.

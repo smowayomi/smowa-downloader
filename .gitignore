@@ -7,3 +7,8 @@ release/
 test-results/
 playwright-report/
 .preview/
+
+src-tauri/resources/
+*.key
+*.key.pub
+release-assets/

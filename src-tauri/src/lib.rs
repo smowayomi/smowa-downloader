@@ -20,6 +20,10 @@ pub struct Options {
     pub format: String,
     pub quality: String,
     pub folder: String,
+    #[serde(default)]
+    pub start_time: Option<f64>,
+    #[serde(default)]
+    pub end_time: Option<f64>,
 }
 
 pub fn download_args(o: &Options) -> Result<Vec<String>, String> {
@@ -37,6 +41,22 @@ pub fn download_args(o: &Options) -> Result<Vec<String>, String> {
         return Err("Choose an absolute download folder".into());
     }
     let mut args: Vec<String> = vec!["--newline","--progress","--no-colors","--windows-filenames","--no-overwrites","--progress-delta","0.5","--progress-template","download:SMOWA_PROGRESS:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s","--print","after_move:SMOWA_FILE:%(filepath)s","-o","%(title).160B [%(id)s] [%(format_id)s].%(ext)s","-P", &o.folder].into_iter().map(String::from).collect();
+    match (o.start_time, o.end_time) {
+        (None, None) => {}
+        (Some(start), Some(end))
+            if start.is_finite() && end.is_finite() && start >= 0.0 && end > start =>
+        {
+            args.extend([
+                "--download-sections".into(),
+                format!("*{start}-{end}"),
+                "--force-keyframes-at-cuts".into(),
+            ]);
+            let output = args.iter().position(|a| a == "-o").unwrap() + 1;
+            args[output] =
+                format!("%(title).140B [%(id)s] [%(format_id)s] [clip {start}-{end}].%(ext)s");
+        }
+        _ => return Err("Enter a valid start and end time; end must be after start".into()),
+    }
     if ["mp3", "m4a"].contains(&o.format.as_str()) {
         args.extend([
             "-f".into(),
@@ -122,6 +142,8 @@ mod tests {
             format: "mp4".into(),
             quality: "best".into(),
             folder: std::env::temp_dir().to_string_lossy().into(),
+            start_time: None,
+            end_time: None,
         }
     }
     #[test]
@@ -165,6 +187,35 @@ mod tests {
         assert!(download_args(&o).is_err());
         o.format = "mp3".into();
         assert!(download_args(&o).unwrap().contains(&"-x".into()));
+    }
+    #[test]
+    fn section_downloads_are_validated_and_have_distinct_filenames() {
+        let mut o = options();
+        assert!(!download_args(&o)
+            .unwrap()
+            .iter()
+            .any(|a| a == "--download-sections"));
+        o.start_time = Some(12.5);
+        o.end_time = Some(30.0);
+        let args = download_args(&o).unwrap();
+        assert!(args.iter().any(|a| a == "*12.5-30"));
+        assert!(args.iter().any(|a| a.contains("[clip 12.5-30]")));
+        for (start, end) in [
+            (Some(-1.0), Some(10.0)),
+            (Some(10.0), Some(10.0)),
+            (Some(f64::NAN), Some(20.0)),
+            (Some(0.0), None),
+            (None, Some(20.0)),
+        ] {
+            o.start_time = start;
+            o.end_time = end;
+            assert!(download_args(&o).is_err());
+        }
+        let legacy = serde_json::json!({"url":"https://example.com","resolution":0,"codec":"auto","format":"mp4","quality":"best","folder":"C:/Downloads"});
+        assert!(serde_json::from_value::<Options>(legacy)
+            .unwrap()
+            .start_time
+            .is_none());
     }
     #[test]
     fn parses_real_progress() {

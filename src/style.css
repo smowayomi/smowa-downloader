@@ -770,3 +770,13 @@ code {
 
 #settings-page { border-bottom: 1px solid var(--line); margin-bottom: 14px; }
 #settings-toggle[aria-expanded="true"] { border-color: var(--focus); color: var(--focus); }
+
+.update-toggle { flex-direction: row; align-items: center; gap: 8px; color: var(--text); }
+.update-toggle input { accent-color: var(--focus); }
+.update-actions { display: flex; gap: 8px; margin-top: 10px; }
+#app-version { color: var(--muted); font-size: 12px; }
+#engine-banner { padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+
+.clip-controls { margin-top: 8px; }
+.clip-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.clip-fields .hint { grid-column: 1 / -1; margin: 0; }

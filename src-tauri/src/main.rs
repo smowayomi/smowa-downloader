@@ -1,4 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod engine;
+mod updates;
 use serde::{Deserialize, Serialize};
 use smowa::{download_args, progress, validate_url, Options};
 #[cfg(windows)]
@@ -39,6 +41,7 @@ struct Data {
     pending: Vec<String>,
     history: PathBuf,
     storage_error: String,
+    installing_update: bool,
 }
 fn hidden(c: &mut Command) -> &mut Command {
     #[cfg(windows)]
@@ -46,6 +49,12 @@ fn hidden(c: &mut Command) -> &mut Command {
     c
 }
 fn tool(name: &str) -> PathBuf {
+    if let Some(dir) = engine::TOOLS.get() {
+        let managed = dir.join(format!("{name}.exe"));
+        if managed.is_file() {
+            return managed;
+        }
+    }
     let local = std::env::current_exe()
         .unwrap()
         .parent()
@@ -136,7 +145,12 @@ async fn inspect_video(url: String) -> Result<serde_json::Value, String> {
     tauri::async_runtime::spawn_blocking(move||{let out=command().args(["--dump-single-json","--skip-download","--",&url]).output().map_err(|e|format!("yt-dlp could not start. Run setup-tools.ps1. {e}"))?;if !out.status.success(){return Err(String::from_utf8_lossy(&out.stderr).chars().take(2500).collect());}let v:serde_json::Value=serde_json::from_slice(&out.stdout).map_err(|e|e.to_string())?;Ok(serde_json::json!({"title":v["title"],"thumbnail":v["thumbnail"],"duration":v["duration"],"uploader":v["uploader"],"formats":v["formats"],"audioOnly": v["vcodec"].as_str() == Some("none") || v["formats"].as_array().is_some_and(|fs| !fs.is_empty() && fs.iter().all(|f| f["vcodec"].as_str() == Some("none"))),"url":url}))}).await.map_err(|e|e.to_string())?
 }
 #[tauri::command]
-fn start_download(options: Options, title: String, state: State<Shared>) -> Result<String, String> {
+fn start_download(
+    options: Options,
+    title: String,
+    state: State<Shared>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
     download_args(&options)?;
     std::fs::create_dir_all(&options.folder).map_err(|e| e.to_string())?;
     let id = uuid::Uuid::new_v4().to_string();
@@ -157,6 +171,12 @@ fn start_download(options: Options, title: String, state: State<Shared>) -> Resu
         options,
     };
     let mut d = state.0.lock().unwrap();
+    if engine::is_busy(&app) {
+        return Err("Download tools are being updated. Please try again shortly.".into());
+    }
+    if d.installing_update {
+        return Err("An app update is being installed. Try again after restart.".into());
+    }
     d.jobs.insert(0, job);
     save(&mut d);
     Ok(id)
@@ -305,8 +325,14 @@ fn cancel(id: String, state: State<Shared>) -> Result<(), String> {
     Ok(())
 }
 #[tauri::command]
-fn retry(id: String, state: State<Shared>) -> Result<(), String> {
+fn retry(id: String, state: State<Shared>, app: tauri::AppHandle) -> Result<(), String> {
     let mut d = state.0.lock().unwrap();
+    if d.installing_update {
+        return Err("An app update is being installed".into());
+    }
+    if engine::is_busy(&app) {
+        return Err("Download tools are being updated. Please try again shortly.".into());
+    }
     if d.processes.contains_key(&id) {
         return Err("The previous process is still stopping. Try again in a moment.".into());
     }
@@ -485,6 +511,7 @@ fn main() {
             receive(app, args)
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             snapshot,
             inspect_video,
@@ -495,7 +522,13 @@ fn main() {
             reveal,
             defaults,
             health,
-            register_extension
+            register_extension,
+            updates::update_status,
+            updates::set_auto_updates,
+            updates::check_update,
+            updates::install_update,
+            engine::engine_status,
+            engine::prepare_engine
         ])
         .setup(|app| {
             register_app_link().map_err(std::io::Error::other)?;
@@ -521,8 +554,11 @@ fn main() {
                 pending: vec![],
                 history,
                 storage_error: String::new(),
+                installing_update: false,
             })));
             app.manage(state.clone());
+            engine::initialize(app.handle(), &dir);
+            updates::initialize(app.handle(), &dir);
             std::thread::spawn(move || loop {
                 let job = {
                     let mut d = state.0.lock().unwrap();

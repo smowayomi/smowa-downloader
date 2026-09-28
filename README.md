@@ -2,11 +2,23 @@
 
 A Windows video downloader with a Rust/Tauri desktop app and a Brave/Chrome helper. Paste an HTTP(S) video or audio link from any yt-dlp-supported website, inspect the video, choose your settings and download. Inspired by MeTube's simple workflow.
 
-## Run
+## Install
 
-Open `release/Smowa/SmowaDL.exe`. Keep the complete folder together, including `tools`, `extension`, and `smowa-bridge.exe`. Windows WebView2 is required (included on modern Windows 11 installations).
+Download the Windows x64 installer from [Releases](https://github.com/smowayomi/smowa-downloader/releases/latest). Installation is per user. On first launch, SmowaDL downloads yt-dlp, FFmpeg and Node.js from upstream hosts and verifies SHA-256 checksums. Progress or errors appear in the app; retry with **Settings > Set up / update tools**.
 
-Closing the window hides Smowa in the system tray. Right-click its tray icon to open it or quit. Downloads continue while the window is hidden. Quitting stops running downloads. After an unexpected shutdown, interrupted jobs can be retried to resume partial downloads. Windows login autostart is not enabled.
+Closing the window keeps downloads running in the system tray. Quit from the tray to stop the app. Download history remains in `%APPDATA%\com.smowa.downloader` across upgrades.
+
+## Updates
+
+App updates are enabled by default. SmowaDL checks at startup and every six hours, downloads a newer signed release, and installs only when no downloads or tool setup are running and the window is closed. Settings includes **Check for updates**, **Update now**, and the automatic-update preference. An offline connection or invalid signature leaves the installed version intact.
+
+yt-dlp and FFmpeg separately check for new stable releases at startup and daily when downloads are idle. Existing tools are kept if a download or checksum check fails. Node.js is yt-dlp's JavaScript runtime for sites such as YouTube, not a separate downloader.
+
+Install the public release once to move from the development portable folder to the installed updater channel. The unpacked browser extension needs a browser **Reload** after changes; the app cannot silently reload it.
+
+## Download a section
+
+After inspecting media, enable **Download a section** and enter Start and End using seconds, `mm:ss` or `hh:mm:ss` (up to millisecond precision). End must be after Start and within the known duration. FFmpeg produces exact cuts, which may require re-encoding and take longer. Depending on the website, more than the selected section may still be transferred. Clip timestamps appear in history and filenames so different clips do not overwrite one another.
 
 ## Connect Brave or Chrome (one time)
 
@@ -67,6 +79,12 @@ Actual availability follows the bundled yt-dlp version; a listed site is not a g
 
 ### Browser connection troubleshooting
 
-Version 0.2.0 of the extension no longer uses native messaging for downloads. If you still see ìSpecified native messaging host not foundî, reload the extension at `brave://extensions`: that message comes from the older popup. Confirm the extension version is 0.2.0. Open SmowaDL.exe once, click the popup link, and accept Brave's external-app prompt. No extension ID pairing is needed for the new handoff.
+Version 0.2.0 of the extension no longer uses native messaging for downloads. If you still see ‚ÄúSpecified native messaging host not found‚Äù, reload the extension at `brave://extensions`: that message comes from the older popup. Confirm the extension version is 0.2.0. Open SmowaDL.exe once, click the popup link, and accept Brave's external-app prompt. No extension ID pairing is needed for the new handoff.
 
 The previous native messaging failure was reproducible in the normal Brave profile but not isolated tests. Its underlying cause is unresolved; app links avoid that lookup entirely.
+
+## Release maintenance
+
+The Windows action validates pushes and pull requests. A tag matching the app version (for example `v0.2.0`) builds a per-user NSIS installer, signs it and publishes the installer, signature, extension ZIP, checksums and `latest.json` updater feed. Keep versions in package.json, package-lock.json, Cargo.toml, Cargo.lock and tauri.conf.json in sync before tagging.
+
+Repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` are required. Keep a separate private-key/password backup: replacing the key breaks updates for existing installations. Secrets must never be committed. The updater signature is separate from Windows Authenticode signing.
