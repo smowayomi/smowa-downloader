@@ -780,3 +780,25 @@ code {
 .clip-controls { margin-top: 8px; }
 .clip-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .clip-fields .hint { grid-column: 1 / -1; margin: 0; }
+.option-grid.audio-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#clip-fields { margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.trim-preview { position: relative; background: #101216; border-radius: 6px; overflow: hidden; }
+.trim-preview video { display: block; width: 100%; height: 210px; object-fit: contain; }
+.trim-preview p { padding: 8px 12px; margin: 0; color: var(--muted); font-size: 12px; }
+.trim-heading, .trim-scale, .trim-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.trim-heading { margin-top: 12px; }
+.trim-heading output, .trim-scale, #trim-position { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.trim-timeline { position: relative; height: 40px; margin: 0 10px; }
+.trim-track { position: absolute; inset: 16px 0; background: #101216; border-radius: 4px; }
+#trim-selection { position: absolute; top: 0; bottom: 0; background: var(--focus); opacity: .8; }
+.trim-timeline input[type=range] { position: absolute; inset: 0; margin: 0; padding: 0; width: 100%; height: 40px; appearance: none; background: transparent; border: 0; pointer-events: none; }
+.trim-timeline input[type=range]::-webkit-slider-thumb { appearance: none; pointer-events: auto; width: 16px; height: 28px; border-radius: 4px; background: var(--focus); border: 2px solid #16181d; cursor: ew-resize; }
+.trim-timeline input[type=range]:focus-visible { outline: 0; }
+.trim-timeline input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--text); outline-offset: 2px; }
+.trim-scale { margin: -2px 0 10px; }
+.trim-times { display: grid; grid-template-columns: minmax(70px,1fr) auto minmax(70px,1fr) auto; gap: 8px; align-items: end; }
+.trim-times input { width: 100%; font-variant-numeric: tabular-nums; }
+.trim-times button { font-size: 12px; padding: 9px; }
+.trim-actions { margin-top: 10px; }
+#clip-hint { margin-bottom: 0; font-size: 12px; }
+@media(max-width:760px) { .trim-times { grid-template-columns: minmax(0,1fr) auto; } .trim-preview video { height: 170px; } }

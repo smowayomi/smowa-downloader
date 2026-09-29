@@ -21,6 +21,7 @@ import {
   CircleHelp,
 } from "lucide";
 import "./style.css";
+import { TrimEditor } from "./trim";
 const downloadIcon = new URL("./download-icon.svg", import.meta.url).href;
 
 type Options = {
@@ -54,6 +55,8 @@ type Video = {
   uploader: string;
   url: string;
   formats: {
+    url?: string;
+    protocol?: string;
     height?: number;
     vcodec?: string;
     acodec?: string;
@@ -133,9 +136,11 @@ async function call<T>(
 
 document.querySelector("#app")!.innerHTML = `
 <main><header><div class="brand"><img class="brand-icon" src="${downloadIcon}" alt="" />SmowaDL <span class="brand-detail">Downloader</span></div><span id="crumb" class="sr-only">Downloads</span><div class="header-status"><span class="pill"><span class="status-dot"></span><b>Running</b></span><button id="settings-toggle" class="icon-button" aria-label="Settings" title="Settings" aria-expanded="false" aria-controls="settings-page">${icon("settings-2")}</button></div></header><div class="content"><p id="engine-banner" class="hint" role="status" hidden></p><section id="downloads-page"><div class="page-heading"><div><h1>Downloads</h1><p>Download video and audio from hundreds of sites supported by yt-dlp.</p></div><button class="secondary" id="focus-url">${icon("plus")} New download</button></div>
-<section class="composer"><div class="composer-top"><span class="section-label">${icon("link")} ADD A MEDIA LINK</span><div class="platforms"><span>YouTube</span><span>Vimeo</span><span>SoundCloud</span><span>+ hundreds more</span></div></div><form id="analyze-form"><label class="sr-only" for="url">Video URL</label><div class="url-row"><input id="url" type="url" required placeholder="Paste a video link here…" autocomplete="off"><button class="primary" id="analyze" type="submit">Get video ${icon("chevron-right")}</button></div></form><div id="analyze-error" class="inline-error" role="alert" hidden></div><div id="video-info" hidden></div><div id="options" hidden><div class="option-grid"><label>Resolution<select id="resolution"></select></label><label>Video codec<select id="codec"></select></label><label>Format<select id="format"><option value="mp4">MP4 · Video</option><option value="mkv">MKV · Video</option><option value="webm">WebM · Video</option><option value="mp3">MP3 · Audio</option><option value="m4a">M4A · Audio</option></select></label><label>Quality<select id="quality"><option value="best">Best available</option><option value="balanced">Balanced · prefer 30 fps</option><option value="small">Smaller · prefer lower bitrate</option></select></label></div><p class="hint" id="quality-hint">Original streams, no video re-encoding. Resolution is a maximum; availability depends on the video.</p><div class="clip-controls"><label class="update-toggle"><input id="clip-enabled" type="checkbox"> Download a section</label><div id="clip-fields" class="clip-fields" hidden><label>Start<input id="clip-start" placeholder="0:00" value="0:00" inputmode="decimal" aria-describedby="clip-hint"></label><label>End<input id="clip-end" placeholder="1:30" inputmode="decimal" aria-describedby="clip-hint"></label><p id="clip-hint" class="hint">Use seconds, mm:ss or hh:mm:ss. Exact cuts may re-encode video and take longer. Some sites still transfer the full source.</p></div></div><div class="destination"><button id="choose-folder" class="folder-button">${icon("folder-open")}<span><small>SAVE TO</small><span id="folder-label"></span></span></button><button id="download" class="primary">${icon("arrow-down-to-line")} Download</button></div></div><div id="composer-hint" class="composer-hint">${icon("chrome")} Send the current video from your browser with the browser helper.</div></section>
+<section class="composer"><div class="composer-top"><span class="section-label">${icon("link")} ADD A MEDIA LINK</span><div class="platforms"><span>YouTube</span><span>Vimeo</span><span>SoundCloud</span><span>+ hundreds more</span></div></div><form id="analyze-form"><label class="sr-only" for="url">Video URL</label><div class="url-row"><input id="url" type="url" required placeholder="Paste a video link here…" autocomplete="off"><button class="primary" id="analyze" type="submit">Get video ${icon("chevron-right")}</button></div></form><div id="analyze-error" class="inline-error" role="alert" hidden></div><div id="video-info" hidden></div><div id="options" hidden><div class="option-grid"><label>Format<select id="format"><option value="mp4">MP4 · Video</option><option value="mkv">MKV · Video</option><option value="webm">WebM · Video</option><option value="mp3">MP3 · Audio</option><option value="m4a">M4A · Audio</option></select></label><label>Resolution<select id="resolution"></select></label><label>Video codec<select id="codec"></select></label><label><span id="quality-label">Quality</span><select id="quality"><option value="best">Best available</option><option value="balanced">Balanced · prefer 30 fps</option><option value="small">Smaller · prefer lower bitrate</option></select></label></div><p class="hint" id="quality-hint">Original streams, no video re-encoding. Resolution is a maximum; availability depends on the video.</p><div class="clip-controls"><label class="update-toggle"><input id="clip-enabled" type="checkbox"> Download a section</label><div id="clip-fields" hidden></div></div><div class="destination"><button id="choose-folder" class="folder-button">${icon("folder-open")}<span><small>SAVE TO</small><span id="folder-label"></span></span></button><button id="download" class="primary">${icon("arrow-down-to-line")} Download</button></div></div><div id="composer-hint" class="composer-hint">${icon("chrome")} Send the current video from your browser with the browser helper.</div></section>
 <div class="list-heading"><h2>All downloads <span id="active-count">0</span></h2><button id="clear-history" class="secondary">Clear finished</button></div><label class="search-box">${icon("search")}<input id="search" placeholder="Search title or website" aria-label="Search downloads"></label><div id="history-list"></div><div class="tip"><span>${icon("circle-help")}</span><p>Downloads continue when you close this window.</p></div></section>
-<section id="settings-page" hidden><section class="setup-card"><h2>App updates <span id="app-version"></span></h2><label class="update-toggle"><input type="checkbox" id="auto-updates"> Automatically download and install updates</label><p class="hint">Installs when downloads are finished and this window is closed. Your history and preferences are kept.</p><p id="update-status" role="status">Checking update settings...</p><div class="update-actions"><button id="check-update" class="secondary">Check for updates</button><button id="install-update" class="primary" hidden>Update now</button></div></section><div class="page-heading"><div><h1>Browser helper</h1><p>One click in your browser brings the current video to SmowaDL.</p></div></div><section class="setup-card"><div class="setup-icon">${icon("chrome")}</div><h2>Connect Brave or Chrome</h2><p>Load the included extension in Brave or Chrome once. Windows app links connect it automatically.</p><ol><li>Open <code>brave://extensions</code> (or <code>chrome://extensions</code>) and enable <strong>Developer mode</strong>.</li><li>Click <strong>Load unpacked</strong> and select the <code>extension</code> folder beside SmowaDL.exe.</li><li>Copy the extension’s ID and paste it below.</li></ol><p class="hint">The controls below are only for older extensions using the native helper.</p><label for="extension-id">Legacy browser extension ID</label><div class="url-row"><input id="extension-id" placeholder="32-letter extension ID" maxlength="32"><button id="connect" class="primary">Connect helper</button></div><p id="connect-result" role="status"></p><div class="hint">Pin SmowaDL to your browser toolbar. Click it on a video to open the download options, even when the app is closed.</div></section><section class="setup-card"><h2>Download engine</h2><p>yt-dlp downloads media. FFmpeg merges, trims and converts it. Node.js runs JavaScript that yt-dlp needs for sites such as YouTube; it is a helper, not a separate downloader. Tools check for the latest stable releases at startup and daily when downloads are idle.</p><div id="health" class="health"></div><p class="hint">If a site changes, close SmowaDL and run Update tools.cmd in the release folder. Some private or restricted videos require authentication and are not supported by this version.</p><button id="check-tools" class="secondary">Check tools</button> <button id="setup-tools" class="secondary">Set up / update tools</button></section></section></div><footer><span><span class="status-dot"></span> <span id="footer-status">Ready when you are</span></span><span>Files stay on your computer</span></footer></main><div id="toast" class="toast" role="status" hidden></div>`;
+<section id="settings-page" hidden><section class="setup-card"><h2>App updates <span id="app-version"></span></h2><label class="update-toggle"><input type="checkbox" id="auto-updates"> Automatically download and install updates</label><p class="hint">Installs when downloads are finished and this window is closed. Your history and preferences are kept.</p><p id="update-status" role="status">Checking update settings...</p><div class="update-actions"><button id="check-update" class="secondary">Check for updates</button><button id="install-update" class="primary" hidden>Update now</button></div></section><div class="page-heading"><div><h1>Browser helper</h1><p>One click in your browser brings the current video to SmowaDL.</p></div></div><section class="setup-card"><div class="setup-icon">${icon("chrome")}</div><h2>Connect Brave or Chrome</h2><p>Load the included extension in Brave or Chrome once. Windows app links connect it automatically.</p><ol><li>Open <code>brave://extensions</code> (or <code>chrome://extensions</code>) and enable <strong>Developer mode</strong>.</li><li>Click <strong>Load unpacked</strong> and select the <code>extension</code> folder beside SmowaDL.exe.</li><li>Pin SmowaDL to the toolbar and click it on a video page.</li></ol><p class="hint">The controls below are only for older extensions using the native helper.</p><label for="extension-id">Legacy browser extension ID</label><div class="url-row"><input id="extension-id" placeholder="32-letter extension ID" maxlength="32"><button id="connect" class="primary">Connect helper</button></div><p id="connect-result" role="status"></p><div class="hint">Pin SmowaDL to your browser toolbar. Click it on a video to open the download options, even when the app is closed.</div></section><section class="setup-card"><h2>Download engine</h2><p>yt-dlp downloads media. FFmpeg merges, trims and converts it. Node.js runs JavaScript that yt-dlp needs for sites such as YouTube; it is a helper, not a separate downloader. Tools check for the latest stable releases at startup and daily when downloads are idle.</p><div id="health" class="health"></div><p class="hint">If a site changes, use Set up / update tools below. Some private or restricted videos require authentication and are not supported by this version.</p><button id="check-tools" class="secondary">Check tools</button> <button id="setup-tools" class="secondary">Set up / update tools</button></section></section></div><footer><span><span class="status-dot"></span> <span id="footer-status">Ready when you are</span></span><span>Files stay on your computer</span></footer></main><div id="toast" class="toast" role="status" hidden></div>`;
+
+const trim = new TrimEditor($("clip-fields"));
 
 function navigate(next: string) {
   page = next;
@@ -228,6 +233,7 @@ async function analyze(url: string) {
   if (analyzing) return;
   analyzing = true;
   video = null;
+  trim.reset();
   $("options").hidden = true;
   $("video-info").hidden = true;
   $("composer-hint").hidden = true;
@@ -238,8 +244,7 @@ async function analyze(url: string) {
     video = await call<Video>("inspect_video", { url });
     $<HTMLInputElement>("clip-enabled").checked = false;
     $("clip-fields").hidden = true;
-    $<HTMLInputElement>("clip-start").value = "0:00";
-    $<HTMLInputElement>("clip-end").value = video.duration ? String(video.duration) : "";
+    trim.setMedia(video);
     $("video-info").hidden = false;
     let thumb = "";
     try {
@@ -319,11 +324,26 @@ $("choose-folder").onclick = async () => {
   }
 };
 function updateFormat() {
-  const audio = ["mp3", "m4a"].includes($<HTMLSelectElement>("format").value);
+  const format = $<HTMLSelectElement>("format").value;
+  const audio = ["mp3", "m4a"].includes(format);
+  const quality = $<HTMLSelectElement>("quality");
+  if (quality.dataset.format !== format) {
+    const previous = quality.value;
+    const choices = audio
+      ? [["best", "Best source quality"], [format === "mp3" ? "320K" : "256K", format === "mp3" ? "320 kbps when converting" : "256 kbps when converting"], ["192K", "192 kbps when converting"], ["128K", "128 kbps when converting"]]
+      : [["best", "Best available"], ["balanced", "Balanced · prefer 30 fps"], ["small", "Smaller · lower bitrate"]];
+    quality.innerHTML = choices.map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
+    quality.value = choices.some(([value]) => value === previous) ? previous : "best";
+    quality.dataset.format = format;
+  }
+  $("quality-label").textContent = audio ? "Audio encoding" : "Quality";
+  $("resolution").parentElement!.hidden = audio;
+  $("codec").parentElement!.hidden = audio;
+  document.querySelector(".option-grid")!.classList.toggle("audio-options", audio);
   $<HTMLSelectElement>("resolution").disabled = audio;
   $<HTMLSelectElement>("codec").disabled = audio;
   $("quality-hint").textContent = audio
-    ? "Audio is extracted and converted with FFmpeg. Quality controls the audio encoding."
+    ? "Matching audio is kept without conversion. Bitrate applies when conversion is needed; higher values cannot restore missing detail."
     : $<HTMLInputElement>("clip-enabled").checked
       ? "Exact section cuts may re-encode video. Resolution and codec select the source streams."
       : "Original streams, no video re-encoding. Resolution is a maximum; availability depends on the video.";
@@ -336,7 +356,7 @@ function parseTimestamp(value: string): number {
   if (!Number.isFinite(seconds)) throw Error("Invalid timestamp.");
   return seconds;
 }
-$("clip-enabled").onchange = () => { $("clip-fields").hidden = !$<HTMLInputElement>("clip-enabled").checked; updateFormat(); };
+$("clip-enabled").onchange = () => { const enabled = $<HTMLInputElement>("clip-enabled").checked; $("clip-fields").hidden = !enabled; trim.toggle(enabled); updateFormat(); };
 $("download").onclick = async () => {
   if (!video || busy) return;
   busy = true;

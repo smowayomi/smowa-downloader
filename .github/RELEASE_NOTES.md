@@ -1,12 +1,5 @@
-Download the Windows x64 installer below. SmowaDL sets up its download tools on first launch; an internet connection is required.
+SmowaDL now includes a visual section editor: preview playback, draggable start/end handles, precise timestamps, and play-selection controls. Format comes first, and audio formats show audio encoding choices instead of video quality presets.
 
-- Compact single-page queue and history.
-- Brave/Chrome helper and discreet media buttons for YouTube, Instagram, X and TikTok.
-- Signed automatic app updates, with installation deferred until downloads finish and the window is closed.
-- Automatic stable yt-dlp and FFmpeg updates while idle.
-- Start/end timestamp downloads with separate clip filenames.
-- Windows default file manager support.
+Preview availability depends on the website and its playable streams. When playback is unavailable, the timeline and timestamps remain usable. Audio bitrate targets apply when conversion is needed; matching source audio is preserved.
 
-The extension is included beside the installed app and available separately as a ZIP. Load it unpacked at brave://extensions or chrome://extensions. After app updates, reload the unpacked extension and refresh your media pages.
-
-Existing portable users: install this release once to move onto the automatic-update channel. History remains in the same app-data folder. The installer has an updater signature; it does not have a commercial Windows Authenticode certificate.
+The Windows installer includes signed automatic app updates, background download-tool maintenance, and the Brave/Chrome browser helper.

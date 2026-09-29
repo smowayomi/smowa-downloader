@@ -33,7 +33,9 @@ pub fn download_args(o: &Options) -> Result<Vec<String>, String> {
     }
     if !["auto", "h264", "vp9", "av1"].contains(&o.codec.as_str())
         || !["mp4", "mkv", "webm", "mp3", "m4a"].contains(&o.format.as_str())
-        || !["best", "balanced", "small"].contains(&o.quality.as_str())
+        || !(["best", "balanced", "small"].contains(&o.quality.as_str())
+            || (["mp3", "m4a"].contains(&o.format.as_str())
+                && ["128K", "192K", "256K", "320K"].contains(&o.quality.as_str())))
     {
         return Err("Invalid download options".into());
     }
@@ -66,6 +68,7 @@ pub fn download_args(o: &Options) -> Result<Vec<String>, String> {
             o.format.clone(),
             "--audio-quality".into(),
             match o.quality.as_str() {
+                "128K" | "192K" | "256K" | "320K" => o.quality.as_str(),
                 "balanced" => "5",
                 "small" => "9",
                 _ => "0",
@@ -187,6 +190,18 @@ mod tests {
         assert!(download_args(&o).is_err());
         o.format = "mp3".into();
         assert!(download_args(&o).unwrap().contains(&"-x".into()));
+    }
+    #[test]
+    fn bitrate_options_are_audio_only() {
+        let mut o = options();
+        o.quality = "192K".into();
+        assert!(download_args(&o).is_err());
+        o.format = "mp3".into();
+        let args = download_args(&o).unwrap();
+        let i = args.iter().position(|v| v == "--audio-quality").unwrap();
+        assert_eq!(args[i + 1], "192K");
+        o.quality = "--exec".into();
+        assert!(download_args(&o).is_err());
     }
     #[test]
     fn section_downloads_are_validated_and_have_distinct_filenames() {
