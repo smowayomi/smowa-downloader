@@ -37,6 +37,8 @@ To remove the app-link registration, remove `HKCU\Software\Classes\smowadl`. Old
 
 ## Features and behavior
 
+- Subtle navigation and feedback animations, smooth queue movement and stable progress updates. Motion follows the Windows reduced-motion preference and stops when the app is hidden.
+
 - Resolution ceiling, source codec selection (H.264 / VP9 / AV1 where available), quality preference, MP4 / MKV / WebM video, MP3 / M4A audio, folder picker.
 - One download at a time with a reorderable queue, pause/resume, Download next, bulk resume, progress, speed, ETA, cancellation, retries and opening the default file manager. Partial data is kept when paused; resuming depends on the source and interrupted conversion or trimming may restart that stage.
 - Searchable persistent history in `%APPDATA%\com.smowa.downloader\history.json`. Clearing history keeps downloaded files.

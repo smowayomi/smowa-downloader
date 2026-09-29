@@ -1,10 +1,10 @@
-param([Parameter(Mandatory)][string]$Tag, [string]$Repository = 'smowayomi/smowa-downloader')
+param([Parameter(Mandatory)][string]$Tag, [string]$Repository = 'smowayomi/smowa-downloader', [string]$OutputDirectory = 'release-assets')
 $ErrorActionPreference = 'Stop'
 $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
 if ($Tag -ne "v$version") { throw 'Release tag must match the app version' }
 $installer = Get-Item "src-tauri/target/release/bundle/nsis/SmowaDL_${version}_x64-setup.exe"
 if (!$installer -or !(Test-Path "$($installer.FullName).sig")) { throw 'Signed installer is missing' }
-$out = Join-Path (Get-Location) 'release-assets'
+$out = Join-Path (Get-Location) $OutputDirectory
 New-Item -ItemType Directory -Force $out | Out-Null
 $installerName = "SmowaDL_${version}_x64-setup.exe"
 Copy-Item -LiteralPath $installer.FullName -Destination "$out/$installerName" -Force
