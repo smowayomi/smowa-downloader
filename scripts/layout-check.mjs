@@ -10,6 +10,7 @@ try {
   const page = await browser.newPage({
     viewport: { width: 1180, height: 820 },
   });
+  page.on("pageerror", e => console.log("PAGE ERROR", e.message));
   await page.addInitScript(() => {
     window.__TAURI_INTERNALS__ = {
       invoke: async (cmd) => {
@@ -42,6 +43,7 @@ try {
   await page
     .getByRole("textbox", { name: "Video URL", exact: true })
     .fill("https://www.youtube.com/watch?v=test");
+  await page.getByRole("button", { name: "Downloader", exact: true }).click();
   await page.getByRole("button", { name: "Get video" }).click();
   await page.waitForFunction(() => document.querySelector("#analyze").disabled);
   for (const width of [1180, 880, 760, 640]) {
@@ -114,7 +116,8 @@ try {
   await page.locator('#download').click();
   if (await page.evaluate(() => window.testJobs.length) !== 0) throw Error('Invalid clip range accepted');
   await page.locator('#clip-end').fill('0:15.500');
-  await page.getByRole('textbox', {name:'Search downloads'}).fill('no match');
+  await page.locator('#clip-end').blur();
+  await page.evaluate(() => { const el = document.querySelector('#search'); el.value = 'no match'; el.dispatchEvent(new Event('input')); });
   await page.locator('#download').click();
   await page.locator('#history-list .job-status').filter({hasText:'queued'}).waitFor();
   if (await page.locator('#search').inputValue()) throw Error('New download hidden by search');
@@ -131,6 +134,10 @@ try {
   });
   if (alignment > 1) throw Error(`Status and action misaligned by ${alignment}px`);
   await page.screenshot({path:'.preview/completed-alignment.png', fullPage:true});
+  if (!(await page.locator('#history-page').isVisible()) || await page.locator('#downloads-page').isVisible()) throw Error('Queue navigation failed');
+  await page.getByRole('button', {name:'Copy file', exact:true}).click();
+  if (!(await page.locator('#toast').textContent()).includes('File copied')) throw Error('Copy confirmation missing');
+  console.log('PASS queue navigation and copy-file action');
   console.log('PASS queued download appears immediately and remains after completion');
   await page.evaluate(() => {
     const previous = window.__TAURI_INTERNALS__.invoke;
@@ -144,6 +151,7 @@ try {
           }
         : previous(cmd);
   });
+  await page.getByRole("button", { name: "Downloader", exact: true }).click();
   await page.getByRole("button", { name: "Get video" }).click();
   await page.waitForFunction(
     () => document.querySelector("#format").value === "m4a",
@@ -163,6 +171,7 @@ try {
   await page
     .getByRole("button", { name: "Settings", exact: true })
     .click();
+  if (await page.locator("#downloads-page").isVisible() || await page.locator("#history-page").isVisible()) throw Error("Settings failed to hide other panels");
   await page.screenshot({
     path: ".preview/smowaudio-helper.png",
     fullPage: true,

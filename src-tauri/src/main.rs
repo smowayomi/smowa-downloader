@@ -78,6 +78,8 @@ fn command() -> Command {
     let mut c = Command::new(tool("yt-dlp"));
     hidden(&mut c);
     c.args([
+        "--encoding",
+        "utf-8",
         "--ignore-config",
         "--no-playlist",
         "--no-colors",
@@ -389,22 +391,44 @@ fn open_folder(folder: &std::path::Path) -> Result<(), String> {
     }
     Ok(())
 }
-#[tauri::command]
-fn reveal(id: String, state: State<Shared>) -> Result<(), String> {
-    let d = state.0.lock().unwrap();
-    let j = d
+fn completed_file(id: &str, state: &Shared) -> Result<PathBuf, String> {
+    let mut d = state.0.lock().unwrap();
+    let job = d
         .jobs
-        .iter()
+        .iter_mut()
         .find(|j| j.id == id)
         .ok_or("Download not found")?;
-    let p = PathBuf::from(&j.file);
-    if j.status != "completed" || !p.is_file() {
-        return Err("The downloaded file is no longer at its original location".into());
+    if job.status != "completed" {
+        return Err("The download has not finished yet".into());
     }
-    let folder = p.parent().ok_or("Download folder not found")?.to_path_buf();
-    drop(d);
-    open_folder(&folder)?;
-    Ok(())
+    let path = smowa::resolve_downloaded_file(&job.file)?;
+    if path != std::path::Path::new(&job.file) {
+        job.file = path.to_string_lossy().into_owned();
+        save(&mut d);
+    }
+    Ok(path)
+}
+#[tauri::command]
+fn reveal(id: String, state: State<Shared>) -> Result<(), String> {
+    let path = completed_file(&id, &state)?;
+    open_folder(path.parent().ok_or("Download folder not found")?)
+}
+#[tauri::command]
+async fn copy_file(id: String, state: State<'_, Shared>) -> Result<(), String> {
+    let path = completed_file(&id, &state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        // FileDrop is a file clipboard entry, not text. A separate STA process lets
+        // Windows Forms persist the data after exit. The path is never shell code.
+        let script = "$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.Windows.Forms; $files=New-Object System.Collections.Specialized.StringCollection; [void]$files.Add($env:SMOWADL_CLIPBOARD_FILE); [System.Windows.Forms.Clipboard]::SetFileDropList($files)";
+        let output = hidden(Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-STA", "-Command", script])
+            .env("SMOWADL_CLIPBOARD_FILE", path))
+            .output().map_err(|e| format!("Could not copy file: {e}"))?;
+        if !output.status.success() {
+            return Err("Could not access the clipboard. Please try Copy file again.".into());
+        }
+        Ok(())
+    }).await.map_err(|e| e.to_string())?
 }
 #[tauri::command]
 fn defaults(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
@@ -520,6 +544,7 @@ fn main() {
             retry,
             clear_history,
             reveal,
+            copy_file,
             defaults,
             health,
             register_extension,

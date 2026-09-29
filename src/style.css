@@ -802,3 +802,13 @@ code {
 .trim-actions { margin-top: 10px; }
 #clip-hint { margin-bottom: 0; font-size: 12px; }
 @media(max-width:760px) { .trim-times { grid-template-columns: minmax(0,1fr) auto; } .trim-preview video { height: 170px; } }
+.top-tabs { display: flex; gap: 4px; }
+.top-tabs button { background: transparent; color: var(--muted); border: 1px solid transparent; border-radius: 6px; padding: 7px 10px; white-space: nowrap; }
+.top-tabs button:hover, .top-tabs button.active { color: var(--text); background: var(--raised); }
+.top-tabs button.active { border-color: var(--line-strong); }
+#queue-count { background: var(--focus); color: var(--well); border-radius: 10px; padding: 0 5px; font-size: 11px; }
+.job-actions { display: flex; gap: 6px; flex-shrink: 0; align-self: flex-start; }
+@media(max-width:760px) { .top-tabs button { padding: 7px 8px; font-size: 12px; } .top-tabs svg { display: none; } }
+/* Keep validation feedback from moving the action under the pointer on blur. */
+#trim-error { min-height: 20px; padding: 0; margin: 4px 0; }
+#trim-error[hidden] { display: block !important; visibility: hidden; }

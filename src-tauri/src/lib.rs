@@ -279,3 +279,53 @@ fn app_links_validate_and_preserve_media_urls() {
         assert!(parse_app_link(bad).is_err(), "{bad}");
     }
 }
+
+/// Older Windows pipe output dropped non-ASCII characters. Recover only one
+/// exact ASCII-projected filename in the original directory; never guess by title.
+pub fn resolve_downloaded_file(stored: &str) -> Result<std::path::PathBuf, String> {
+    let path = std::path::PathBuf::from(stored);
+    if path.is_file() {
+        return Ok(path);
+    }
+    let missing = "The downloaded file is no longer at its original location";
+    let name = path.file_name().and_then(|n| n.to_str()).ok_or(missing)?;
+    let ascii = |s: &str| s.chars().filter(char::is_ascii).collect::<String>();
+    let expected = ascii(name);
+    let mut matches = std::fs::read_dir(path.parent().ok_or(missing)?)
+        .map_err(|_| missing)?
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry.path().is_file()
+                && entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|n| ascii(n) == expected)
+        });
+    let found = matches.next().ok_or(missing)?.path();
+    if matches.next().is_some() {
+        return Err(
+            "More than one file matches this history entry. Open the download folder manually."
+                .into(),
+        );
+    }
+    Ok(found)
+}
+#[test]
+fn recovers_unicode_paths_without_guessing_ambiguous_names() {
+    let dir = std::env::temp_dir().join(format!("smowa-path-test-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let unicode = dir.join("Video \u{1f62d} [123].mp4");
+    std::fs::write(&unicode, b"test").unwrap();
+    let stored = dir.join("Video  [123].mp4");
+    assert_eq!(
+        resolve_downloaded_file(stored.to_str().unwrap()).unwrap(),
+        unicode
+    );
+    let other = dir.join("Video \u{1f600} [123].mp4");
+    std::fs::write(&other, b"test").unwrap();
+    assert!(resolve_downloaded_file(stored.to_str().unwrap()).is_err());
+    assert!(resolve_downloaded_file(dir.join("Missing.mp4").to_str().unwrap()).is_err());
+    std::fs::remove_file(unicode).unwrap();
+    std::fs::remove_file(other).unwrap();
+    std::fs::remove_dir(dir).unwrap();
+}
