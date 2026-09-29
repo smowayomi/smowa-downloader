@@ -1,3 +1,3 @@
-SmowaDL 0.2.2 adds Downloader, History/Queue and Settings tabs, plus a Copy file action beside Show in folder. Starting a download immediately opens the queue.
+SmowaDL 0.2.3 simplifies everyday downloads with Format and Resolution first, optional advanced controls, remembered preferences, and a sticky download action while trimming.
 
-Fixed saved file paths losing Unicode characters on Windows. Existing history paths are repaired when there is one exact matching filename in the original folder.
+History now has All, In progress, Completed and Needs attention filters, with active downloads first. Keyboard focus and expanded error details survive progress updates. Settings hides legacy extension configuration until needed. Ctrl+L focuses the media link; Clear form starts fresh.

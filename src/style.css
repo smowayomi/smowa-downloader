@@ -812,3 +812,20 @@ code {
 /* Keep validation feedback from moving the action under the pointer on blur. */
 #trim-error { min-height: 20px; padding: 0; margin: 4px 0; }
 #trim-error[hidden] { display: block !important; visibility: hidden; }
+/* Task-focused layout: common choices first; advanced controls on demand. */
+.content { max-width: 1060px; margin: 0 auto; }
+.option-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.advanced-options { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+.advanced-options summary, .legacy-helper summary { cursor: pointer; color: var(--text); padding: 6px 0; }
+.advanced-options summary span { color: var(--muted); font-size: 12px; margin-left: 8px; }
+.advanced-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; padding-top: 8px; }
+.destination { position: sticky; bottom: 0; z-index: 3; background: var(--panel); padding: 12px 0 2px; box-shadow: 0 -8px 14px var(--panel); }
+.history-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.history-filters button { padding: 7px 12px; background: transparent; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); }
+.history-filters button[aria-pressed=true] { color: var(--text); background: var(--raised); border-color: var(--line-strong); }
+#history-page .list-heading h2 { font-size: 13px; color: var(--muted); }
+#settings-page { border: 0; }
+#settings-page > .setup-card { padding: 16px; }
+.legacy-helper { margin: 12px 0; border-top: 1px solid var(--line); padding-top: 6px; }
+#history-new { white-space: nowrap; }
+@media(max-width:760px) { .advanced-options summary span { display: none; } .history-filters button { padding: 7px 9px; } }

@@ -137,7 +137,12 @@ try {
   if (!(await page.locator('#history-page').isVisible()) || await page.locator('#downloads-page').isVisible()) throw Error('Queue navigation failed');
   await page.getByRole('button', {name:'Copy file', exact:true}).click();
   if (!(await page.locator('#toast').textContent()).includes('File copied')) throw Error('Copy confirmation missing');
-  console.log('PASS queue navigation and copy-file action');
+  await page.getByRole('button', {name:'In progress', exact:true}).click();
+  if (await page.locator('#history-list .job').count()) throw Error('Completed entry in active filter');
+  await page.getByRole('button', {name:'Completed', exact:true}).click();
+  if (await page.locator('#history-list .job').count() !== 1) throw Error('Completed filter lost entry');
+  await page.getByRole('button', {name:'All', exact:true}).click();
+  console.log('PASS queue navigation, status filters and copy-file action');
   console.log('PASS queued download appears immediately and remains after completion');
   await page.evaluate(() => {
     const previous = window.__TAURI_INTERNALS__.invoke;

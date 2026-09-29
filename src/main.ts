@@ -72,6 +72,7 @@ let jobs: Job[] = [],
   busy = false,
   folder = localStorage.getItem("folder") || "",
   filter = "",
+  statusFilter = "all",
   pending: string[] = [],
   toolHealth: Record<string, boolean> = {};
 const icons = () =>
@@ -137,12 +138,34 @@ async function call<T>(
 }
 
 document.querySelector("#app")!.innerHTML = `
-<main><header><div class="brand"><img class="brand-icon" src="${downloadIcon}" alt="" />SmowaDL <span class="brand-detail">Downloader</span></div><nav class="top-tabs" aria-label="Main navigation"><button data-page="downloads" aria-controls="downloads-page" aria-current="page" class="active">${icon("download")} Downloader</button><button data-page="history" aria-controls="history-page">${icon("history")} History/Queue <span id="queue-count" hidden></span></button><button data-page="settings" aria-controls="settings-page">${icon("settings-2")} Settings</button></nav><span id="crumb" class="sr-only">Downloader</span></header><div class="content"><p id="engine-banner" class="hint" role="status" hidden></p><section id="downloads-page"><div class="page-heading"><div><h1>Downloads</h1><p>Download video and audio from hundreds of sites supported by yt-dlp.</p></div><button class="secondary" id="focus-url">${icon("plus")} New download</button></div>
-<section class="composer"><div class="composer-top"><span class="section-label">${icon("link")} ADD A MEDIA LINK</span><div class="platforms"><span>YouTube</span><span>Vimeo</span><span>SoundCloud</span><span>+ hundreds more</span></div></div><form id="analyze-form"><label class="sr-only" for="url">Video URL</label><div class="url-row"><input id="url" type="url" required placeholder="Paste a video link here…" autocomplete="off"><button class="primary" id="analyze" type="submit">Get video ${icon("chevron-right")}</button></div></form><div id="analyze-error" class="inline-error" role="alert" hidden></div><div id="video-info" hidden></div><div id="options" hidden><div class="option-grid"><label>Format<select id="format"><option value="mp4">MP4 · Video</option><option value="mkv">MKV · Video</option><option value="webm">WebM · Video</option><option value="mp3">MP3 · Audio</option><option value="m4a">M4A · Audio</option></select></label><label>Resolution<select id="resolution"></select></label><label>Video codec<select id="codec"></select></label><label><span id="quality-label">Quality</span><select id="quality"><option value="best">Best available</option><option value="balanced">Balanced · prefer 30 fps</option><option value="small">Smaller · prefer lower bitrate</option></select></label></div><p class="hint" id="quality-hint">Original streams, no video re-encoding. Resolution is a maximum; availability depends on the video.</p><div class="clip-controls"><label class="update-toggle"><input id="clip-enabled" type="checkbox"> Download a section</label><div id="clip-fields" hidden></div></div><div class="destination"><button id="choose-folder" class="folder-button">${icon("folder-open")}<span><small>SAVE TO</small><span id="folder-label"></span></span></button><button id="download" class="primary">${icon("arrow-down-to-line")} Download</button></div></div><div id="composer-hint" class="composer-hint">${icon("chrome")} Send the current video from your browser with the browser helper.</div></section>
-</section><section id="history-page" hidden><div class="list-heading"><h2>History / Queue <span id="active-count">0</span></h2><button id="clear-history" class="secondary">Clear finished</button></div><label class="search-box">${icon("search")}<input id="search" placeholder="Search title or website" aria-label="Search downloads"></label><div id="history-list"></div><div class="tip"><span>${icon("circle-help")}</span><p>Downloads continue when you close this window.</p></div></section>
-<section id="settings-page" hidden><section class="setup-card"><h2>App updates <span id="app-version"></span></h2><label class="update-toggle"><input type="checkbox" id="auto-updates"> Automatically download and install updates</label><p class="hint">Installs when downloads are finished and this window is closed. Your history and preferences are kept.</p><p id="update-status" role="status">Checking update settings...</p><div class="update-actions"><button id="check-update" class="secondary">Check for updates</button><button id="install-update" class="primary" hidden>Update now</button></div></section><div class="page-heading"><div><h1>Browser helper</h1><p>One click in your browser brings the current video to SmowaDL.</p></div></div><section class="setup-card"><div class="setup-icon">${icon("chrome")}</div><h2>Connect Brave or Chrome</h2><p>Load the included extension in Brave or Chrome once. Windows app links connect it automatically.</p><ol><li>Open <code>brave://extensions</code> (or <code>chrome://extensions</code>) and enable <strong>Developer mode</strong>.</li><li>Click <strong>Load unpacked</strong> and select the <code>extension</code> folder beside SmowaDL.exe.</li><li>Pin SmowaDL to the toolbar and click it on a video page.</li></ol><p class="hint">The controls below are only for older extensions using the native helper.</p><label for="extension-id">Legacy browser extension ID</label><div class="url-row"><input id="extension-id" placeholder="32-letter extension ID" maxlength="32"><button id="connect" class="primary">Connect helper</button></div><p id="connect-result" role="status"></p><div class="hint">Pin SmowaDL to your browser toolbar. Click it on a video to open the download options, even when the app is closed.</div></section><section class="setup-card"><h2>Download engine</h2><p>yt-dlp downloads media. FFmpeg merges, trims and converts it. Node.js runs JavaScript that yt-dlp needs for sites such as YouTube; it is a helper, not a separate downloader. Tools check for the latest stable releases at startup and daily when downloads are idle.</p><div id="health" class="health"></div><p class="hint">If a site changes, use Set up / update tools below. Some private or restricted videos require authentication and are not supported by this version.</p><button id="check-tools" class="secondary">Check tools</button> <button id="setup-tools" class="secondary">Set up / update tools</button></section></section></div><footer><span><span class="status-dot"></span> <span id="footer-status">Ready when you are</span></span><span>Files stay on your computer</span></footer></main><div id="toast" class="toast" role="status" hidden></div>`;
+<main><header><div class="brand"><img class="brand-icon" src="${downloadIcon}" alt="" />SmowaDL <span class="brand-detail">Downloader</span></div><nav class="top-tabs" aria-label="Main navigation"><button data-page="downloads" aria-controls="downloads-page" aria-current="page" class="active">${icon("download")} Downloader</button><button data-page="history" aria-controls="history-page">${icon("history")} History/Queue <span id="queue-count" hidden></span></button><button data-page="settings" aria-controls="settings-page">${icon("settings-2")} Settings</button></nav><span id="crumb" class="sr-only">Downloader</span></header><div class="content"><p id="engine-banner" class="hint" role="status" hidden></p><section id="downloads-page"><div class="page-heading"><div><h1>New download</h1><p>Paste a link, choose your format, and save.</p></div><button class="secondary" id="focus-url">${icon("x")} Clear form</button></div>
+<section class="composer"><div class="composer-top"><span class="section-label">${icon("link")} ADD A MEDIA LINK</span><div class="platforms"><span>YouTube</span><span>Vimeo</span><span>SoundCloud</span><span>+ hundreds more</span></div></div><form id="analyze-form"><label class="sr-only" for="url">Video URL</label><div class="url-row"><input id="url" type="url" required placeholder="Paste a video link here…" autocomplete="off"><button class="primary" id="analyze" type="submit">Get video ${icon("chevron-right")}</button></div></form><div id="analyze-error" class="inline-error" role="alert" hidden></div><div id="video-info" hidden></div><div id="options" hidden><div class="option-grid"><label>Format<select id="format"><option value="mp4">MP4 · Video</option><option value="mkv">MKV · Video</option><option value="webm">WebM · Video</option><option value="mp3">MP3 · Audio</option><option value="m4a">M4A · Audio</option></select></label><label>Resolution<select id="resolution"></select></label><label>Video codec<select id="codec"></select></label><label><span id="quality-label">Quality</span><select id="quality"><option value="best">Best available</option><option value="balanced">Balanced · prefer 30 fps</option><option value="small">Smaller · prefer lower bitrate</option></select></label></div><p class="hint" id="quality-hint">Original streams, no video re-encoding. Resolution is a maximum; availability depends on the video.</p><div class="clip-controls"><label class="update-toggle"><input id="clip-enabled" type="checkbox"> Download a section</label><div id="clip-fields" hidden></div></div><p id="download-error" class="inline-error" role="alert" hidden></p><div class="destination"><button id="choose-folder" class="folder-button">${icon("folder-open")}<span><small>SAVE TO</small><span id="folder-label"></span></span></button><button id="download" class="primary">${icon("arrow-down-to-line")} Download</button></div></div><div id="composer-hint" class="composer-hint">${icon("chrome")} Send the current video from your browser with the browser helper.</div></section>
+</section><section id="history-page" hidden><div class="page-heading"><div><h1>Your downloads</h1><p id="queue-summary">All your downloads in one place.</p></div><button class="secondary" id="history-new">${icon("plus")} New download</button></div><div class="history-filters" aria-label="Filter downloads"><button data-filter="all" aria-pressed="true">All</button><button data-filter="active" aria-pressed="false">In progress</button><button data-filter="completed" aria-pressed="false">Completed</button><button data-filter="attention" aria-pressed="false">Needs attention</button></div><div class="list-heading"><h2>Showing <span id="active-count">0</span></h2><button id="clear-history" class="secondary">Clear finished</button></div><label class="search-box">${icon("search")}<input id="search" placeholder="Search title or website" aria-label="Search downloads"></label><div id="history-list"></div><div class="tip"><span>${icon("circle-help")}</span><p>Downloads continue when you close this window.</p></div></section>
+<section id="settings-page" hidden><div class="page-heading"><div><h1>Settings</h1><p>Updates, browser integration, and download tools.</p></div></div><section class="setup-card"><h2>App updates <span id="app-version"></span></h2><label class="update-toggle"><input type="checkbox" id="auto-updates"> Automatically download and install updates</label><p class="hint">Installs when downloads are finished and this window is closed. Your history and preferences are kept.</p><p id="update-status" role="status">Checking update settings...</p><div class="update-actions"><button id="check-update" class="secondary">Check for updates</button><button id="install-update" class="primary" hidden>Update now</button></div></section><div class="page-heading"><div><h1>Browser helper</h1><p>One click in your browser brings the current video to SmowaDL.</p></div></div><section class="setup-card"><div class="setup-icon">${icon("chrome")}</div><h2>Connect Brave or Chrome</h2><p>Load the included extension in Brave or Chrome once. Windows app links connect it automatically.</p><ol><li>Open <code>brave://extensions</code> (or <code>chrome://extensions</code>) and enable <strong>Developer mode</strong>.</li><li>Click <strong>Load unpacked</strong> and select the <code>extension</code> folder beside SmowaDL.exe.</li><li>Pin SmowaDL to the toolbar and click it on a video page.</li></ol><details class="legacy-helper"><summary>Legacy extension connection</summary><p class="hint">Only needed for older extensions.</p><label for="extension-id">Legacy browser extension ID</label><div class="url-row"><input id="extension-id" placeholder="32-letter extension ID" maxlength="32"><button id="connect" class="primary">Connect helper</button></div><p id="connect-result" role="status"></p></details><div class="hint">Pin SmowaDL to your browser toolbar. Click it on a video to open the download options, even when the app is closed.</div></section><section class="setup-card"><h2>Download engine</h2><p>yt-dlp downloads media. FFmpeg merges, trims and converts it. Node.js runs JavaScript that yt-dlp needs for sites such as YouTube; it is a helper, not a separate downloader. Tools check for the latest stable releases at startup and daily when downloads are idle.</p><div id="health" class="health"></div><p class="hint">If a site changes, use Set up / update tools below. Some private or restricted videos require authentication and are not supported by this version.</p><button id="check-tools" class="secondary">Check tools</button> <button id="setup-tools" class="secondary">Set up / update tools</button></section></section></div><footer><span><span class="status-dot"></span> <span id="footer-status">Ready when you are</span></span><span>Files stay on your computer</span></footer></main><div id="toast" class="toast" role="status" hidden></div>`;
 
+// Keep common choices prominent, with technical preferences available on demand.
+const advanced = document.createElement("details");
+advanced.className = "advanced-options";
+advanced.innerHTML = '<summary>Advanced options <span>Codec and quality preferences</span></summary><div class="advanced-grid"></div>';
+$("quality-hint").before(advanced);
+advanced.querySelector("div")!.append($("codec").parentElement!, $("quality").parentElement!);
 const trim = new TrimEditor($("clip-fields"));
+let preferences: Record<string, string> = {};
+try { const saved = JSON.parse(localStorage.getItem("download-preferences") || "{}"); if (saved && typeof saved === "object" && !Array.isArray(saved)) preferences = saved; } catch {}
+function rememberOptions() {
+  for (const id of ["format", "resolution", "codec", "quality"]) preferences[id] = $<HTMLSelectElement>(id).value;
+  localStorage.setItem("download-preferences", JSON.stringify(preferences));
+}
+function restoreOptions() {
+  for (const id of ["format", "resolution", "codec"]) {
+    const control = $<HTMLSelectElement>(id);
+    if (Array.from(control.options).some(o => o.value === preferences[id] && !o.disabled)) control.value = preferences[id];
+  }
+  updateFormat();
+  const quality = $<HTMLSelectElement>("quality");
+  if (Array.from(quality.options).some(o => o.value === preferences.quality)) quality.value = preferences.quality;
+}
+for (const id of ["format", "resolution", "codec", "quality"]) $(id).addEventListener("change", () => { if (id === "format") updateFormat(); rememberOptions(); $("download-error").hidden = true; });
 
 function navigate(next: string) {
   page = next;
@@ -169,8 +192,20 @@ document.querySelectorAll<HTMLButtonElement>("[data-page]").forEach(button => {
   button.onclick = () => { navigate(button.dataset.page!); window.scrollTo({top: 0}); };
 });
 $("focus-url").onclick = () => {
+  if (analyzing) return;
+  video = null; trim.reset();
+  $("options").hidden = true; $("video-info").hidden = true;
+  $("analyze-error").hidden = true; $("composer-hint").hidden = false;
+  $<HTMLInputElement>("url").value = "";
   $<HTMLInputElement>("url").focus();
 };
+$("history-new").onclick = () => { navigate("downloads"); $("url").focus(); };
+document.querySelectorAll<HTMLButtonElement>("[data-filter]").forEach(button => {
+  button.onclick = () => { statusFilter = button.dataset.filter!; renderJobs(); };
+});
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey && e.key.toLowerCase() === "l") { e.preventDefault(); navigate("downloads"); $<HTMLInputElement>("url").select(); }
+});
 $("search").oninput = () => {
   filter = $<HTMLInputElement>("search").value.toLowerCase();
   renderJobs();
@@ -192,9 +227,17 @@ $("clear-history").onclick = async () => {
 function renderJobs() {
   const queue = jobs.filter(active),
     history = jobs.filter(
-      (j) => `${j.title} ${j.url}`.toLowerCase().includes(filter),
+      (j) => `${j.title} ${j.url}`.toLowerCase().includes(filter) &&
+        (statusFilter === "all" || (statusFilter === "active" ? active(j) : statusFilter === "completed" ? j.status === "completed" : ["failed", "cancelled", "interrupted"].includes(j.status))),
     );
-  $("active-count").textContent = String(jobs.length);
+  history.sort((a, b) => Number(active(b)) - Number(active(a)) || b.created - a.created);
+  const focused = document.activeElement as HTMLElement | null;
+  const focusAction = focused?.dataset.action, focusId = focused?.dataset.id;
+  const expanded = new Set(Array.from(document.querySelectorAll<HTMLDetailsElement>("#history-list details[open]")).map(el => el.closest<HTMLElement>("[data-job]")?.dataset.job));
+  $("queue-summary").textContent = `${queue.length} in progress · ${jobs.filter(j => j.status === "completed").length} completed`;
+  document.querySelectorAll<HTMLButtonElement>("[data-filter]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.filter === statusFilter)));
+  $<HTMLButtonElement>("clear-history").disabled = !jobs.some(j => !active(j));
+  $("active-count").textContent = String(history.length);
   $("queue-count").textContent = String(queue.length);
   $("queue-count").hidden = !queue.length;
   $("footer-status").textContent = queue.length
@@ -202,7 +245,7 @@ function renderJobs() {
     : "Ready when you are";
   $("history-list").innerHTML = history.length
     ? history.map(card).join("")
-    : `<div class="empty-state"><div class="empty-icon">${icon("history")}</div><h3>${filter ? "No matching downloads" : "Your collection starts here"}</h3><p>${filter ? "Try another title or website." : "Queued, active and finished downloads appear here."}</p></div>`;
+    : `<div class="empty-state"><div class="empty-icon">${icon("history")}</div><h3>${filter || statusFilter !== "all" ? "No downloads here" : "Your collection starts here"}</h3><p>${filter || statusFilter !== "all" ? "Try another filter or search." : "Queued, active and finished downloads appear here."}</p></div>`;
   document.querySelectorAll<HTMLButtonElement>("[data-action]").forEach(
     (b) =>
       (b.onclick = async () => {
@@ -218,6 +261,8 @@ function renderJobs() {
         }
       }),
   );
+  document.querySelectorAll<HTMLDetailsElement>("#history-list details").forEach(el => { el.open = expanded.has(el.closest<HTMLElement>("[data-job]")?.dataset.job); });
+  if (focusAction && focusId) Array.from(document.querySelectorAll<HTMLButtonElement>("#history-list [data-action]")).find(b => b.dataset.action === focusAction && b.dataset.id === focusId)?.focus({preventScroll:true});
   icons();
 }
 function card(j: Job) {
@@ -227,7 +272,7 @@ function card(j: Job) {
   } catch {}
   const running = active(j),
     done = j.status === "completed";
-  return `<article class="job"><div class="job-icon ${done ? "complete" : ""}">${icon(done ? "check" : "film")}</div><div class="job-body"><div class="job-top"><h3 title="${esc(j.title)}">${esc(j.title || j.url)}</h3><span class="job-status ${esc(j.status)}">${esc(j.status)}</span></div><div class="job-meta">${esc(host)}<span>·</span>${esc(j.options.format.toUpperCase())}<span>·</span>${j.options.resolution ? j.options.resolution + "p" : "Best"}<span>·</span>${new Date(j.created * 1000).toLocaleDateString()}${j.options.start_time != null ? `<span>·</span>Clip ${j.options.start_time}s–${j.options.end_time}s` : ""}</div>${running ? `<progress max="100" value="${j.percent}" aria-label="Download progress"></progress><div class="progress-label"><span>${j.status === "queued" ? "Waiting in queue" : j.status === "processing" ? "Merging / converting" : esc(j.speed) || "Connecting…"}</span><span>${j.eta ? "ETA " + esc(j.eta) + " · " : ""}${j.percent.toFixed(1)}%</span></div>` : ""}${j.error ? `<details><summary>Download details</summary><pre>${esc(j.error)}</pre></details>` : ""}</div><div class="job-actions">${done ? `<button class="icon-button" data-action="copy_file" data-id="${j.id}" aria-label="Copy file" title="Copy file">${icon("copy")}</button>` : ""}<button class="icon-button" data-action="${running ? "cancel" : done ? "reveal" : "retry"}" data-id="${j.id}" aria-label="${running ? "Cancel download" : done ? "Show in folder" : "Retry download"}" title="${running ? "Cancel download" : done ? "Show in folder" : "Retry download"}">${icon(running ? "x" : done ? "folder-open" : "rotate-ccw")}</button></div></article>`;
+  return `<article class="job" data-job="${esc(j.id)}"><div class="job-icon ${done ? "complete" : ""}">${icon(done ? "check" : "film")}</div><div class="job-body"><div class="job-top"><h3 title="${esc(j.title)}">${esc(j.title || j.url)}</h3><span class="job-status ${esc(j.status)}">${esc(j.status)}</span></div><div class="job-meta">${esc(host)}<span>·</span>${esc(j.options.format.toUpperCase())}<span>·</span>${["mp3", "m4a"].includes(j.options.format) ? "Audio" : j.options.resolution ? j.options.resolution + "p" : "Best resolution"}<span>·</span>${new Date(j.created * 1000).toLocaleDateString()}${j.options.start_time != null ? `<span>·</span>Clip ${j.options.start_time}s–${j.options.end_time}s` : ""}</div>${running ? `<progress max="100" value="${j.percent}" aria-label="Download progress"></progress><div class="progress-label"><span>${j.status === "queued" ? "Waiting in queue" : j.status === "processing" ? "Merging / converting" : esc(j.speed) || "Connecting…"}</span><span>${j.eta ? "ETA " + esc(j.eta) + " · " : ""}${j.percent.toFixed(1)}%</span></div>` : ""}${j.error ? `<details><summary>Download details</summary><pre>${esc(j.error)}</pre></details>` : ""}</div><div class="job-actions">${done ? `<button class="icon-button" data-action="copy_file" data-id="${j.id}" aria-label="Copy file" title="Copy file">${icon("copy")}</button>` : ""}<button class="icon-button" data-action="${running ? "cancel" : done ? "reveal" : "retry"}" data-id="${j.id}" aria-label="${running ? "Cancel download" : done ? "Show in folder" : "Retry download"}" title="${running ? "Cancel download" : done ? "Show in folder" : "Retry download"}">${icon(running ? "x" : done ? "folder-open" : "rotate-ccw")}</button></div></article>`;
 }
 
 $("analyze-form").onsubmit = async (e) => {
@@ -243,7 +288,9 @@ async function analyze(url: string) {
   $("video-info").hidden = true;
   $("composer-hint").hidden = true;
   $("analyze-error").hidden = true;
+  $("download-error").hidden = true;
   $<HTMLButtonElement>("analyze").disabled = true;
+  $<HTMLButtonElement>("focus-url").disabled = true;
   $("analyze").textContent = "Getting video…";
   try {
     video = await call<Video>("inspect_video", { url });
@@ -293,7 +340,7 @@ async function analyze(url: string) {
     if (video.audioOnly && !["mp3", "m4a"].includes(format.value))
       format.value = "m4a";
     $("options").hidden = false;
-    updateFormat();
+    restoreOptions();
     updateFolder();
     icons();
   } catch (e) {
@@ -302,6 +349,7 @@ async function analyze(url: string) {
     $("composer-hint").hidden = false;
   } finally {
     analyzing = false;
+    $<HTMLButtonElement>("focus-url").disabled = false;
     $<HTMLButtonElement>("analyze").disabled = false;
     $("analyze").innerHTML = `Get video ${icon("chevron-right")}`;
     icons();
@@ -345,6 +393,10 @@ function updateFormat() {
   $("resolution").parentElement!.hidden = audio;
   $("codec").parentElement!.hidden = audio;
   document.querySelector(".option-grid")!.classList.toggle("audio-options", audio);
+  const qualityField = $("quality").parentElement!;
+  if (audio) document.querySelector(".option-grid")!.append(qualityField);
+  else advanced.querySelector("div")!.append(qualityField);
+  advanced.hidden = audio;
   $<HTMLSelectElement>("resolution").disabled = audio;
   $<HTMLSelectElement>("codec").disabled = audio;
   $("quality-hint").textContent = audio
@@ -353,7 +405,7 @@ function updateFormat() {
       ? "Exact section cuts may re-encode video. Resolution and codec select the source streams."
       : "Original streams, no video re-encoding. Resolution is a maximum; availability depends on the video.";
 }
-$("format").onchange = updateFormat;
+
 function parseTimestamp(value: string): number {
   const text = value.trim();
   if (!/^\d+(?::[0-5]?\d){0,2}(?:\.\d{1,3})?$/.test(text)) throw Error("Use seconds, mm:ss or hh:mm:ss for timestamps.");
@@ -364,6 +416,7 @@ function parseTimestamp(value: string): number {
 $("clip-enabled").onchange = () => { const enabled = $<HTMLInputElement>("clip-enabled").checked; $("clip-fields").hidden = !enabled; trim.toggle(enabled); updateFormat(); };
 $("download").onclick = async () => {
   if (!video || busy) return;
+  $("download-error").hidden = true;
   busy = true;
   $<HTMLButtonElement>("download").disabled = true;
   try {
@@ -384,7 +437,7 @@ $("download").onclick = async () => {
       folder,
     };
     await call("start_download", { options, title: video.title });
-    filter = "";
+    filter = ""; statusFilter = "all";
     $<HTMLInputElement>("search").value = "";
     renderJobs();
     notify("Added to downloads");
@@ -392,7 +445,9 @@ $("download").onclick = async () => {
     await refresh();
     $("history-list").scrollIntoView({ block: "nearest" });
   } catch (e) {
-    notify(String(e), true);
+    $("download-error").textContent = String(e);
+    $("download-error").hidden = false;
+    $("download-error").scrollIntoView({block:"nearest"});
   } finally {
     busy = false;
     $<HTMLButtonElement>("download").disabled = false;
