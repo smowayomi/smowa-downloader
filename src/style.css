@@ -829,3 +829,20 @@ code {
 .legacy-helper { margin: 12px 0; border-top: 1px solid var(--line); padding-top: 6px; }
 #history-new { white-space: nowrap; }
 @media(max-width:760px) { .advanced-options summary span { display: none; } .history-filters button { padding: 7px 9px; } }
+
+/* Compact controls share the same spacing and surfaces as the download form. */
+.incoming-links { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px; margin-bottom:14px; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+.incoming-links > span { flex:1 1 220px; }
+.queue-tools, .queue-order, .trim-zoom { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.queue-order { margin-top:10px; }
+.queue-order button, .trim-zoom button { min-height:32px; padding:5px 9px; font-size:12px; }
+.trim-zoom { margin:10px 0 4px; }
+.trim-actions { flex-wrap:wrap; }
+.tool-stages { display:grid; gap:6px; margin:12px 0; }
+.tool-stages > div { display:flex; justify-content:space-between; gap:12px; }
+.tool-stages span { color:var(--muted); text-align:right; }
+.job .hint { margin:8px 0 0; font-size:12px; }
+.job-status.paused { background:#9d96ff; color:#111318; }
+@media(max-width:680px) { .list-heading { align-items:flex-start; gap:10px; } .queue-tools { justify-content:flex-end; } }
+
+.progress-label { flex-wrap:wrap; gap:4px 12px; }

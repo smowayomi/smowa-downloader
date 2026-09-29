@@ -32,6 +32,16 @@ struct Job {
     file: String,
     created: u64,
     options: Options,
+    #[serde(default)]
+    queue_order: u64,
+    #[serde(default)]
+    phase: String,
+    #[serde(default)]
+    downloaded_bytes: u64,
+    #[serde(default)]
+    total_bytes: Option<u64>,
+    #[serde(default)]
+    total_estimated: bool,
 }
 #[derive(Clone)]
 struct Shared(Arc<Mutex<Data>>);
@@ -142,7 +152,8 @@ fn snapshot(state: State<Shared>) -> serde_json::Value {
     serde_json::json!({"jobs":d.jobs,"pending":std::mem::take(&mut d.pending),"storageError":d.storage_error})
 }
 #[tauri::command]
-async fn inspect_video(url: String) -> Result<serde_json::Value, String> {
+async fn inspect_video(url: String, app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    engine::ensure_ready(&app)?;
     let url = validate_url(&url)?;
     tauri::async_runtime::spawn_blocking(move||{let out=command().args(["--dump-single-json","--skip-download","--",&url]).output().map_err(|e|format!("yt-dlp could not start. Run setup-tools.ps1. {e}"))?;if !out.status.success(){return Err(String::from_utf8_lossy(&out.stderr).chars().take(2500).collect());}let v:serde_json::Value=serde_json::from_slice(&out.stdout).map_err(|e|e.to_string())?;Ok(serde_json::json!({"title":v["title"],"thumbnail":v["thumbnail"],"duration":v["duration"],"uploader":v["uploader"],"formats":v["formats"],"audioOnly": v["vcodec"].as_str() == Some("none") || v["formats"].as_array().is_some_and(|fs| !fs.is_empty() && fs.iter().all(|f| f["vcodec"].as_str() == Some("none"))),"url":url}))}).await.map_err(|e|e.to_string())?
 }
@@ -156,7 +167,7 @@ fn start_download(
     download_args(&options)?;
     std::fs::create_dir_all(&options.folder).map_err(|e| e.to_string())?;
     let id = uuid::Uuid::new_v4().to_string();
-    let job = Job {
+    let mut job = Job {
         id: id.clone(),
         title: title.chars().take(300).collect(),
         url: options.url.clone(),
@@ -171,17 +182,29 @@ fn start_download(
             .unwrap()
             .as_secs(),
         options,
+        queue_order: 0,
+        phase: "Waiting in queue".into(),
+        downloaded_bytes: 0,
+        total_bytes: None,
+        total_estimated: false,
     };
     let mut d = state.0.lock().unwrap();
-    if engine::is_busy(&app) {
-        return Err("Download tools are being updated. Please try again shortly.".into());
-    }
+    engine::ensure_ready(&app)?;
     if d.installing_update {
         return Err("An app update is being installed. Try again after restart.".into());
     }
+    job.queue_order = next_order(&d);
     d.jobs.insert(0, job);
     save(&mut d);
     Ok(id)
+}
+fn byte_count(value: &str) -> Option<u64> {
+    value
+        .trim()
+        .parse::<f64>()
+        .ok()
+        .filter(|v| v.is_finite() && *v > 0.)
+        .map(|v| v as u64)
 }
 fn run_job(s: &Shared, job: Job) {
     let args = match download_args(&job.options) {
@@ -191,6 +214,9 @@ fn run_job(s: &Shared, job: Job) {
                 s,
                 &job.id,
                 |j| {
+                    if ["paused", "cancelled"].contains(&j.status.as_str()) {
+                        return;
+                    }
                     j.status = "failed".into();
                     j.error = e;
                 },
@@ -208,6 +234,9 @@ fn run_job(s: &Shared, job: Job) {
                 s,
                 &job.id,
                 |j| {
+                    if ["paused", "cancelled"].contains(&j.status.as_str()) {
+                        return;
+                    }
                     j.status = "failed".into();
                     j.error = format!("Could not start yt-dlp: {e}");
                 },
@@ -221,7 +250,7 @@ fn run_job(s: &Shared, job: Job) {
         let mut d = s.0.lock().unwrap();
         if d.jobs
             .iter()
-            .any(|j| j.id == job.id && j.status == "cancelled")
+            .any(|j| j.id == job.id && ["cancelled", "paused"].contains(&j.status.as_str()))
         {
             let _ = child.kill();
             let _ = child.wait();
@@ -249,18 +278,37 @@ fn run_job(s: &Shared, job: Job) {
                 s,
                 &job.id,
                 |j| {
-                    if j.status != "cancelled" {
+                    if !["cancelled", "paused"].contains(&j.status.as_str()) {
                         j.percent = p;
                         j.speed = speed;
                         j.eta = eta;
                         j.status = "downloading".into();
+                        let fields: Vec<_> = line.split('|').collect();
+                        if fields.len() >= 8 {
+                            j.downloaded_bytes = fields[3].parse().unwrap_or(0);
+                            let exact = byte_count(fields[4]);
+                            j.total_bytes = exact.or_else(|| byte_count(fields[5]));
+                            j.total_estimated = exact.is_none();
+                            j.phase = if job.options.start_time.is_some() {
+                                "Downloading section"
+                            } else if fields[6] == "none" {
+                                "Fetching audio"
+                            } else if fields[7] == "none" {
+                                "Fetching video"
+                            } else {
+                                "Fetching media"
+                            }
+                            .into();
+                        }
                     }
                 },
                 false,
             );
         } else if let Some(file) = line.strip_prefix("SMOWA_FILE:") {
             change(s, &job.id, |j| j.file = file.into(), false);
-        } else if line.contains("[Merger]")
+        } else if (job.options.start_time.is_some() && line.starts_with("[download] Destination:"))
+            || line.starts_with("SMOWA_STAGE:")
+            || line.contains("[Merger]")
             || line.contains("[ExtractAudio]")
             || line.contains("[VideoRemuxer]")
         {
@@ -268,8 +316,22 @@ fn run_job(s: &Shared, job: Job) {
                 s,
                 &job.id,
                 |j| {
-                    if j.status != "cancelled" {
+                    if !["cancelled", "paused"].contains(&j.status.as_str()) {
                         j.status = "processing".into();
+                        j.speed.clear();
+                        j.eta.clear();
+                        j.phase = if line.starts_with("[download] Destination:") {
+                            "Downloading and trimming section"
+                        } else if line.contains("Merger") {
+                            "Merging video and audio"
+                        } else if line.contains("ExtractAudio") {
+                            "Converting audio"
+                        } else if job.options.start_time.is_some() {
+                            "Finalizing trimmed section"
+                        } else {
+                            "Finalizing file"
+                        }
+                        .into();
                     }
                 },
                 false,
@@ -283,7 +345,7 @@ fn run_job(s: &Shared, job: Job) {
         s,
         &job.id,
         |j| {
-            if j.status == "cancelled" {
+            if ["cancelled", "paused"].contains(&j.status.as_str()) {
                 return;
             }
             if result.is_ok_and(|r| r.success()) && !j.file.is_empty() {
@@ -291,6 +353,7 @@ fn run_job(s: &Shared, job: Job) {
                 j.percent = 100.;
                 j.speed.clear();
                 j.eta.clear();
+                j.phase = "Completed".into();
             } else {
                 j.status = "failed".into();
                 j.error = if error.is_empty() {
@@ -303,24 +366,114 @@ fn run_job(s: &Shared, job: Job) {
         true,
     );
 }
-#[tauri::command]
-fn cancel(id: String, state: State<Shared>) -> Result<(), String> {
+fn next_order(d: &Data) -> u64 {
+    d.jobs
+        .iter()
+        .map(|j| {
+            if j.queue_order == 0 {
+                j.created
+            } else {
+                j.queue_order
+            }
+        })
+        .max()
+        .unwrap_or(0)
+        .saturating_add(1)
+}
+fn stop_job(id: &str, state: &Shared, status: &str) -> Result<(), String> {
     let mut d = state.0.lock().unwrap();
-    let job = d
+    let index = d
         .jobs
-        .iter_mut()
-        .find(|j| j.id == id)
+        .iter()
+        .position(|j| j.id == id)
         .ok_or("Download not found")?;
-    if !["queued", "downloading", "processing"].contains(&job.status.as_str()) {
+    if !["queued", "downloading", "processing", "paused"].contains(&d.jobs[index].status.as_str()) {
         return Ok(());
     }
-    job.status = "cancelled".into();
-    if let Some(pid) = d.processes.get(&id) {
-        let status = hidden(Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]))
+    if let Some(pid) = d.processes.get(id) {
+        let result = hidden(Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]))
             .status()
             .map_err(|e| e.to_string())?;
-        if !status.success() {
-            return Err("Could not stop the download process".into());
+        if !result.success() {
+            return Err("Could not stop the download process; please retry.".into());
+        }
+    }
+    d.jobs[index].status = status.into();
+    d.jobs[index].phase = if status == "paused" {
+        "Paused; partial data kept"
+    } else {
+        "Cancelled"
+    }
+    .into();
+    d.jobs[index].speed.clear();
+    d.jobs[index].eta.clear();
+    save(&mut d);
+    Ok(())
+}
+#[tauri::command]
+fn cancel(id: String, state: State<Shared>) -> Result<(), String> {
+    stop_job(&id, &state, "cancelled")
+}
+#[tauri::command]
+fn pause(id: String, state: State<Shared>) -> Result<(), String> {
+    stop_job(&id, &state, "paused")
+}
+#[tauri::command]
+fn reorder(id: String, direction: String, state: State<Shared>) -> Result<(), String> {
+    let mut d = state.0.lock().unwrap();
+    reorder_jobs(&mut d.jobs, &id, &direction)?;
+    save(&mut d);
+    Ok(())
+}
+fn reorder_jobs(jobs: &mut [Job], id: &str, direction: &str) -> Result<(), String> {
+    let mut order: Vec<_> = jobs
+        .iter()
+        .filter(|j| j.status == "queued")
+        .map(|j| {
+            (
+                j.id.clone(),
+                if j.queue_order == 0 {
+                    j.created
+                } else {
+                    j.queue_order
+                },
+            )
+        })
+        .collect();
+    order.sort_by_key(|j| j.1);
+    let index = order
+        .iter()
+        .position(|j| j.0 == id)
+        .ok_or("Only queued downloads can be reordered")?;
+    let target = match direction {
+        "next" => 0,
+        "up" => index.saturating_sub(1),
+        "down" => (index + 1).min(order.len() - 1),
+        _ => return Err("Invalid queue direction".into()),
+    };
+    let item = order.remove(index);
+    order.insert(target, item);
+    for (rank, (id, _)) in order.iter().enumerate() {
+        jobs.iter_mut().find(|j| &j.id == id).unwrap().queue_order = rank as u64 + 1;
+    }
+    Ok(())
+}
+#[tauri::command]
+fn resume_all(state: State<Shared>, app: tauri::AppHandle) -> Result<(), String> {
+    let mut d = state.0.lock().unwrap();
+    engine::ensure_ready(&app)?;
+    if d.installing_update {
+        return Err("An app update is being installed".into());
+    }
+    let mut order = next_order(&d);
+    let stopping: Vec<_> = d.processes.keys().cloned().collect();
+    for job in d.jobs.iter_mut().rev() {
+        if ["paused", "interrupted"].contains(&job.status.as_str()) && !stopping.contains(&job.id) {
+            job.status = "queued".into();
+            job.phase = "Waiting to resume".into();
+            job.error.clear();
+            job.queue_order = order;
+            order += 1;
         }
     }
     save(&mut d);
@@ -332,21 +485,22 @@ fn retry(id: String, state: State<Shared>, app: tauri::AppHandle) -> Result<(), 
     if d.installing_update {
         return Err("An app update is being installed".into());
     }
-    if engine::is_busy(&app) {
-        return Err("Download tools are being updated. Please try again shortly.".into());
-    }
+    engine::ensure_ready(&app)?;
     if d.processes.contains_key(&id) {
         return Err("The previous process is still stopping. Try again in a moment.".into());
     }
+    let order = next_order(&d);
     let j = d
         .jobs
         .iter_mut()
         .find(|j| j.id == id)
         .ok_or("Download not found")?;
-    if !["failed", "cancelled", "interrupted"].contains(&j.status.as_str()) {
+    if !["failed", "cancelled", "interrupted", "paused"].contains(&j.status.as_str()) {
         return Err("Only stopped downloads can be retried".into());
     }
     j.status = "queued".into();
+    j.queue_order = order;
+    j.phase = "Waiting to resume".into();
     j.error.clear();
     j.percent = 0.;
     j.file.clear();
@@ -356,8 +510,16 @@ fn retry(id: String, state: State<Shared>, app: tauri::AppHandle) -> Result<(), 
 #[tauri::command]
 fn clear_history(state: State<Shared>) {
     let mut d = state.0.lock().unwrap();
-    d.jobs
-        .retain(|j| ["queued", "downloading", "processing"].contains(&j.status.as_str()));
+    d.jobs.retain(|j| {
+        [
+            "queued",
+            "downloading",
+            "processing",
+            "paused",
+            "interrupted",
+        ]
+        .contains(&j.status.as_str())
+    });
     save(&mut d);
 }
 fn open_folder(folder: &std::path::Path) -> Result<(), String> {
@@ -541,6 +703,7 @@ fn main() {
             inspect_video,
             start_download,
             cancel,
+            pause, reorder, resume_all,
             retry,
             clear_history,
             reveal,
@@ -553,6 +716,7 @@ fn main() {
             updates::check_update,
             updates::install_update,
             engine::engine_status,
+            engine::engine_details,
             engine::prepare_engine
         ])
         .setup(|app| {
@@ -589,10 +753,11 @@ fn main() {
                     let mut d = state.0.lock().unwrap();
                     d.jobs
                         .iter_mut()
-                        .rev()
-                        .find(|j| j.status == "queued")
+                        .filter(|j| j.status == "queued")
+                        .min_by_key(|j| if j.queue_order == 0 {j.created} else {j.queue_order})
                         .map(|j| {
                             j.status = "downloading".into();
+                            j.phase = "Connecting".into();
                             j.clone()
                         })
                 };
@@ -646,4 +811,52 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("Could not launch SmowaDL");
+}
+
+#[cfg(test)]
+mod queue_tests {
+    use super::*;
+    fn job(id: &str, status: &str, created: u64) -> Job {
+        serde_json::from_value(serde_json::json!({"id":id,"title":id,"url":"https://example.com/video", "status":status, "percent":0,"speed":"","eta":"","error":"","file":"","created":created,
+        "options":{"url":"https://example.com/video","resolution":0,"codec":"auto","format":"mp4","quality":"best","folder":"C:/Downloads"}})).unwrap()
+    }
+    fn queued(jobs: &[Job]) -> Vec<&str> {
+        let mut list: Vec<_> = jobs.iter().filter(|j| j.status == "queued").collect();
+        list.sort_by_key(|j| {
+            if j.queue_order == 0 {
+                j.created
+            } else {
+                j.queue_order
+            }
+        });
+        list.iter().map(|j| j.id.as_str()).collect()
+    }
+    #[test]
+    fn queue_order_survives_storage_and_excludes_active_and_paused() {
+        let mut jobs = vec![
+            job("c", "queued", 30),
+            job("active", "downloading", 1),
+            job("b", "queued", 20),
+            job("paused", "paused", 2),
+            job("a", "queued", 10),
+        ];
+        reorder_jobs(&mut jobs, "c", "next").unwrap();
+        assert_eq!(queued(&jobs), ["c", "a", "b"]);
+        reorder_jobs(&mut jobs, "b", "up").unwrap();
+        assert_eq!(queued(&jobs), ["c", "b", "a"]);
+        reorder_jobs(&mut jobs, "c", "down").unwrap();
+        let restored: Vec<Job> =
+            serde_json::from_str(&serde_json::to_string(&jobs).unwrap()).unwrap();
+        assert_eq!(queued(&restored), ["b", "c", "a"]);
+        assert!(reorder_jobs(&mut jobs, "active", "next").is_err());
+        assert!(reorder_jobs(&mut jobs, "paused", "next").is_err());
+        assert!(reorder_jobs(&mut jobs, "a", "invalid").is_err());
+    }
+    #[test]
+    fn estimated_byte_counts_accept_fractional_totals() {
+        assert_eq!(byte_count("1234.5"), Some(1234));
+        for input in ["NA", "NaN", "inf", "-1", "0"] {
+            assert_eq!(byte_count(input), None);
+        }
+    }
 }

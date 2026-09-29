@@ -1,0 +1,61 @@
+import { chromium, expect } from '@playwright/test';
+import { createServer } from 'vite';
+import fs from 'node:fs/promises';
+await fs.mkdir('.preview', {recursive:true});
+const server = await createServer({server:{host:'127.0.0.1',port:5181,strictPort:true}}); await server.listen();
+const browser = await chromium.launch({channel:'chrome',headless:true});
+try {
+ const p=await browser.newPage({viewport:{width:640,height:480}});
+ const errors=[];p.on('pageerror',e=>errors.push(e.message));
+ await p.route('https://media.example.test/**',()=>{});
+ await p.addInitScript(()=>{
+  window.commands=[]; window.incoming=[]; window.setupBusy=false;
+  const options={url:'https://example.com/one',format:'mp4',resolution:1080,codec:'auto',quality:'best',folder:'C:\\Downloads'};
+  window.testJobs=['downloading','queued','queued','paused','interrupted'].map((status,i)=>({id:String(i),title:'Test download '+i,url:options.url,status,queue_order:i,phase:i===0?'Fetching video':'Waiting in queue',downloaded_bytes:i===0?1048576:0,total_bytes:i===0?4194304:null,percent:25,speed:'1 MiB/s',eta:'00:03',error:'',created:100-i,options}));
+  window.__TAURI_INTERNALS__={invoke:async(cmd,args)=>{
+   if(cmd==='defaults')return{folder:'C:\\Downloads'};
+   if(cmd==='snapshot')return{jobs:structuredClone(window.testJobs),pending:window.incoming.splice(0),storageError:''};
+   if(cmd==='health')return{'yt-dlp':true,ffmpeg:true,node:true};
+   if(cmd==='engine_status')return '';
+   if(cmd==='engine_details')return {busy:window.setupBusy,tools:[{name:'yt-dlp',stage:'Ready'},{name:'FFmpeg',stage:'Ready'},{name:'Node.js',stage:'Ready'}]};
+   if(cmd==='inspect_video')return{url:args.url,title:args.url.endsWith('one')?'Original draft':'Incoming video',duration:120,formats:[{url:'https://media.example.test/video.mp4',ext:'mp4',vcodec:'avc1',acodec:'aac',height:1080}]};
+   if(['pause','retry','resume_all','reorder'].includes(cmd)){window.commands.push({cmd,args}); if(cmd==='pause')window.testJobs.find(j=>j.id===args.id).status='paused';}
+  }};
+ });
+ await p.goto('http://127.0.0.1:5181');
+ await p.locator('#url').fill('https://example.com/one');await p.locator('#analyze').click();await p.locator('#options').waitFor({state:'visible'});
+ await p.locator('#format').selectOption('mp3');await p.locator('#quality').selectOption('192K');await p.locator('#clip-enabled').check();
+ await p.locator('#clip-start').fill('0:10');await p.locator('#clip-start').blur();await p.locator('#clip-end').fill('0:20');await p.locator('#clip-end').blur();
+ await p.evaluate(()=>window.incoming.push('https://example.com/two','https://example.com/three'));
+ await expect(p.locator('#incoming-summary')).toContainText('2 browser links waiting');
+ await expect(p.locator('#video-info')).toContainText('Original draft');await expect(p.locator('#clip-start')).toHaveValue('0:10');
+ await p.locator('#incoming-next').click();await expect(p.locator('#video-info')).toContainText('Incoming video');
+ await p.locator('#restore-draft').click();await expect(p.locator('#video-info')).toContainText('Original draft');
+ await expect(p.locator('#format')).toHaveValue('mp3');await expect(p.locator('#quality')).toHaveValue('192K');await expect(p.locator('#clip-start')).toHaveValue('0:10');await expect(p.locator('#clip-end')).toHaveValue('0:20');await expect(p.locator('#clip-enabled')).toBeChecked();
+ await p.locator('#trim-zoom-in').click();await expect(p.locator('#trim-end-handle')).toHaveAttribute('max','60');
+ await p.locator('#trim-zoom-in').click();await expect(p.locator('#trim-end-handle')).toHaveAttribute('max','30');
+ await p.locator('#trim-pan-right').click();await expect(p.locator('#trim-start-handle')).toHaveAttribute('min','15');
+ await expect(p.locator('#clip-start')).toHaveValue('0:10');await expect(p.locator('#clip-end')).toHaveValue('0:20');
+ await p.locator('#trim-zoom-full').click();await expect(p.locator('#trim-end-handle')).toHaveAttribute('max','120');
+ await p.clock.install();await p.locator('#clip-enabled').uncheck();await p.locator('#clip-enabled').check();await p.clock.fastForward(16000);
+ await expect(p.locator('#preview-status')).toContainText('timed out');await expect(p.locator('#preview-retry')).toBeVisible();
+ await p.locator('#preview-retry').click();await expect(p.locator('#preview-status')).toContainText('Loading preview');
+ if(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Trim/draft controls overflow at minimum width');
+ await p.screenshot({path:'.preview/improvements-trim-640.png',fullPage:true});
+ console.log('PASS incoming links preserve and restore format, audio quality and trim; timeline zoom/pan preserves selection; preview timeout and retry');
+ await p.getByRole('button',{name:'History/Queue'}).click();
+ await expect(p.locator('[data-job="0"]')).toContainText('1.0 MiB / 4.0 MiB');await expect(p.locator('[data-job="0"]')).toContainText('ETA 00:03');
+ await p.locator('[data-job="1"] [data-direction="next"]').click();
+ await p.locator('[data-job="0"] [data-action="pause"]').click();await expect(p.locator('[data-job="0"] .job-status')).toHaveText('paused');
+ await p.locator('[data-job="0"] [data-action="retry"]').click();await p.locator('#resume-all').click();
+ const cmds=await p.evaluate(()=>window.commands);
+ if(!cmds.some(c=>c.cmd==='reorder'&&c.args.id==='1'&&c.args.direction==='next')||!cmds.some(c=>c.cmd==='pause')||!cmds.some(c=>c.cmd==='retry')||!cmds.some(c=>c.cmd==='resume_all'))throw Error('Queue action dispatch failed');
+ if(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Queue overflows');
+ await p.screenshot({path:'.preview/improvements-queue-640.png',fullPage:true});
+ await p.getByRole('button',{name:'Settings',exact:true}).click();await expect(p.locator('#tool-stages')).toContainText('FFmpeg');await expect(p.locator('#tool-stages')).toContainText('Ready');
+ await p.evaluate(()=>window.setupBusy=true);await p.clock.fastForward(3100);await expect(p.locator('#setup-tools')).toBeDisabled();
+ await p.getByRole('button',{name:'Downloader',exact:true}).click();await expect(p.locator('#analyze')).toBeDisabled();await expect(p.locator('#download')).toBeDisabled();
+ await p.evaluate(()=>window.setupBusy=false);await p.clock.fastForward(3100);await expect(p.locator('#analyze')).toBeEnabled();
+ console.log('PASS per-tool setup feedback and setup gating; pause, resume, bulk resume and priority controls; transfer bytes and ETA; minimum-width layout');
+ if(errors.length)throw Error(errors.join('\n'));
+} finally {await browser.close();await server.close();}

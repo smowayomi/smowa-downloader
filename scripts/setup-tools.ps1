@@ -8,7 +8,8 @@ function Get-Sha256([string]$Path) {
 }
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
 $Destination = (Resolve-Path -LiteralPath $Destination).Path
-Write-Host 'Downloading yt-dlp from its official release...'
+function Report-Tool([string]$Name, [string]$Stage) { Write-Output "SMOWA_TOOL:$Name|$Stage" }
+Report-Tool 'yt-dlp' 'Checking release'
 $release = Invoke-RestMethod -TimeoutSec 30 'https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest'
 $asset = $release.assets | Where-Object name -eq 'yt-dlp.exe' | Select-Object -First 1
 $hashAsset = $release.assets | Where-Object name -eq 'SHA2-256SUMS' | Select-Object -First 1
@@ -20,12 +21,14 @@ $match = [regex]::Match($checksums, '(?m)^([a-fA-F0-9]{64})\s+\*?yt-dlp\.exe\s*$
 if (!$match.Success) { throw 'yt-dlp checksum missing' }
 $ytTarget = Join-Path $Destination 'yt-dlp.exe'
 if (!(Test-Path -LiteralPath $ytTarget) -or (Get-Sha256 $ytTarget) -ne $match.Groups[1].Value) {
+    Report-Tool 'yt-dlp' 'Downloading'
     Invoke-WebRequest -TimeoutSec 120 -UseBasicParsing $asset.browser_download_url -OutFile $download
     if ((Get-Sha256 $download) -ne $match.Groups[1].Value) { throw 'yt-dlp checksum verification failed.' }
     Move-Item -LiteralPath $download -Destination $ytTarget -Force
 }
 
 
+Report-Tool 'yt-dlp' 'Ready'
 if ($DownloadMissing) {
     $ProgressPreference = 'SilentlyContinue'
     function Get-VerifiedFile([string]$Url, [string]$Checksum, [string]$Path) {
@@ -34,6 +37,7 @@ if ($DownloadMissing) {
         if ($LASTEXITCODE) { throw "Download failed for $Url" }
         if ((Get-Sha256 $Path) -ne $Checksum) { throw "Checksum failed for $Url" }
     }
+    Report-Tool 'FFmpeg' 'Checking release'
     $ffRelease = Invoke-RestMethod -TimeoutSec 30 'https://api.github.com/repos/GyanD/codexffmpeg/releases/latest'
     $ffAsset = $ffRelease.assets | Where-Object name -Like '*-essentials_build.7z' | Select-Object -First 1
     if (!$ffAsset -or $ffAsset.digest -notmatch '^sha256:([a-fA-F0-9]{64})$') { throw 'FFmpeg release checksum not found' }
@@ -43,9 +47,11 @@ if ($DownloadMissing) {
     $previousChecksum = if (Test-Path $ffMarker) { (Get-Content $ffMarker -Raw).Trim() } else { '' }
     if (!(Test-Path "$Destination/ffmpeg.exe") -or !(Test-Path "$Destination/ffprobe.exe") -or $previousChecksum -ne $checksum) {
         $zip = Join-Path $Destination 'ffmpeg.7z'
+        Report-Tool 'FFmpeg' 'Downloading'
         Get-VerifiedFile $ffUrl $checksum $zip
         $extract = Join-Path $Destination ('ffmpeg-' + [guid]::NewGuid())
         New-Item -ItemType Directory -Force $extract | Out-Null
+        Report-Tool 'FFmpeg' 'Verifying and extracting'
         & tar.exe -xf $zip -C $extract
         if ($LASTEXITCODE) { throw "FFmpeg extraction failed" }
         foreach ($name in @('ffmpeg.exe', 'ffprobe.exe')) {
@@ -61,6 +67,8 @@ if ($DownloadMissing) {
         Remove-Item -LiteralPath $zip -Force
         Set-Content -LiteralPath $ffMarker -Value $checksum
     }
+    Report-Tool 'FFmpeg' 'Ready'
+    Report-Tool 'Node.js' 'Checking installation'
     if (!(Test-Path "$Destination/node.exe")) {
         $base = 'https://nodejs.org/dist/latest-v24.x'
         $checks = (Invoke-WebRequest -TimeoutSec 120 -UseBasicParsing "$base/SHASUMS256.txt").Content
@@ -69,9 +77,11 @@ if ($DownloadMissing) {
         if (!$line.Success) { throw 'Node.js checksum not found' }
         $archive = Join-Path $Destination 'node.zip'
         $nodeVersion = $line.Groups[2].Value -replace '^node-(v[0-9.]+)-win-x64.zip$', '$1'
+        Report-Tool 'Node.js' 'Downloading'
         Get-VerifiedFile "https://nodejs.org/dist/$nodeVersion/$($line.Groups[2].Value)" $line.Groups[1].Value $archive
         $nodeExtract = Join-Path $Destination ('node-' + [guid]::NewGuid())
         New-Item -ItemType Directory -Force $nodeExtract | Out-Null
+        Report-Tool 'Node.js' 'Verifying and extracting'
         & tar.exe -xf $archive -C $nodeExtract
         if ($LASTEXITCODE) { throw 'Node.js extraction failed' }
         $nodeRoot = Get-ChildItem -LiteralPath $nodeExtract -Directory | Select-Object -First 1
@@ -84,6 +94,7 @@ if ($DownloadMissing) {
         Remove-Item -LiteralPath $archive -Force
 
     }
+    Report-Tool 'Node.js' 'Ready'
 } else {
     foreach ($name in @('ffmpeg', 'ffprobe', 'node')) {
         $target = Join-Path $Destination "$name.exe"

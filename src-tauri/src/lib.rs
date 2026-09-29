@@ -51,7 +51,12 @@ pub fn download_args(o: &Options) -> Result<Vec<String>, String> {
     if o.folder.trim().is_empty() || !std::path::Path::new(&o.folder).is_absolute() {
         return Err("Choose an absolute download folder".into());
     }
-    let mut args: Vec<String> = vec!["--newline","--progress","--no-colors","--windows-filenames","--no-overwrites","--progress-delta","0.5","--progress-template","download:SMOWA_PROGRESS:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s","--print","after_move:SMOWA_FILE:%(filepath)s","-o","%(title).160B [%(id)s] [%(format_id)s].%(ext)s","-P", &o.folder].into_iter().map(String::from).collect();
+    let mut args: Vec<String> = vec!["--newline","--progress","--no-colors","--windows-filenames","--no-overwrites","--progress-delta","0.5","--progress-template","download:SMOWA_PROGRESS:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s|%(info.vcodec)s|%(info.acodec)s","--print","after_move:SMOWA_FILE:%(filepath)s","-o","%(title).160B [%(id)s] [%(format_id)s].%(ext)s","-P", &o.folder].into_iter().map(String::from).collect();
+    args.extend([
+        "--no-quiet".into(),
+        "--progress-template".into(),
+        "postprocess:SMOWA_STAGE:%(progress.postprocessor)s".into(),
+    ]);
     args.extend([
         "--concurrent-fragments".into(),
         o.fragment_concurrency.to_string(),
@@ -133,10 +138,14 @@ pub fn download_args(o: &Options) -> Result<Vec<String>, String> {
 
 pub fn progress(line: &str) -> Option<(f64, String, String)> {
     let parts: Vec<_> = line.strip_prefix("SMOWA_PROGRESS:")?.split('|').collect();
-    if parts.len() != 3 {
+    if parts.len() < 3 {
         return None;
     }
-    let p = parts[0].trim().trim_end_matches('%').parse::<f64>().ok()?;
+    let p = if parts[0].trim() == "NA" && parts.len() >= 8 {
+        0.
+    } else {
+        parts[0].trim().trim_end_matches('%').parse::<f64>().ok()?
+    };
     if !p.is_finite() {
         return None;
     }
@@ -254,6 +263,18 @@ mod tests {
         );
         assert!(progress("SMOWA_PROGRESS:NA|NA|NA").is_none());
         assert!(progress("SMOWA_PROGRESS:NaN|x|y").is_none());
+        assert_eq!(
+            progress("SMOWA_PROGRESS:NA|NA|NA|1024|NA|NA|avc1|none")
+                .unwrap()
+                .0,
+            0.
+        );
+        assert_eq!(
+            progress("SMOWA_PROGRESS:25%|1MiB/s|00:03|1024|4096|NA|none|aac")
+                .unwrap()
+                .0,
+            25.
+        );
     }
 }
 

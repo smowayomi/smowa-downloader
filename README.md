@@ -4,7 +4,7 @@ A Windows video downloader with a Rust/Tauri desktop app and a Brave/Chrome help
 
 ## Install
 
-Download the Windows x64 installer from [Releases](https://github.com/smowayomi/smowa-downloader/releases/latest). Installation is per user. On first launch, SmowaDL downloads yt-dlp, FFmpeg and Node.js from upstream hosts and verifies SHA-256 checksums. Progress or errors appear in the app; retry with **Settings > Set up / update tools**.
+Download the Windows x64 installer from [Releases](https://github.com/smowayomi/smowa-downloader/releases/latest). Installation is per user. On first launch, SmowaDL downloads yt-dlp, FFmpeg and Node.js from upstream hosts and verifies SHA-256 checksums. Each tool shows its setup stage. Setup is marked successful only after all tools are ready; failures retry automatically after a short delay. You can also retry with **Settings > Set up / update tools**.
 
 Closing the window keeps downloads running in the system tray. Quit from the tray to stop the app. Download history remains in `%APPDATA%\com.smowa.downloader` across upgrades.
 
@@ -18,7 +18,7 @@ Install the public release once to move from the development portable folder to 
 
 ## Download a section
 
-After inspecting media, enable **Download a section** and enter Start and End using seconds, `mm:ss` or `hh:mm:ss` (up to millisecond precision). End must be after Start and within the known duration. FFmpeg produces exact cuts, which may require re-encoding and take longer. Depending on the website, more than the selected section may still be transferred. Clip timestamps appear in history and filenames so different clips do not overwrite one another.
+After inspecting media, enable **Download a section**. Use the preview, timeline handles, zoom and pan controls, or seek in 0.1-second steps. Preview loading times out with a Retry action; the timeline and timestamps remain available when a site does not offer playable media. Enter Start and End using seconds, `mm:ss` or `hh:mm:ss` (up to millisecond precision). End must be after Start and within the known duration. FFmpeg produces exact cuts, which may require re-encoding and take longer. Depending on the website, more than the selected section may still be transferred. Clip timestamps appear in history and filenames so different clips do not overwrite one another.
 
 ## Connect Brave or Chrome (one time)
 
@@ -26,6 +26,8 @@ After inspecting media, enable **Download a section** and enter Start and End us
 2. Choose **Load unpacked** and select `release/Smowa/extension`.
 3. Run **SmowaDL.exe** once to register its Windows app link.
 4. After an update, click **Reload** on the extension card and refresh open media pages. Click **Open in SmowaDL** in the popup, or the small download arrow on supported media. Allow Brave to open SmowaDL if prompted.
+
+Incoming links wait while you edit a download. **Save draft & open next** keeps your media, format, quality, trim times and destination; **Restore previous draft** returns to it. Drafts are kept for the current app session.
 
 The extension uses `smowadl://` Windows app links, independent of native messaging host lookup. The app validates the enclosed HTTP(S) URL and opens download options; it does not download automatically. Run the app again if you move its folder. The installed extension folder remains `release/Smowa/extension` to preserve its ID. Legacy native messaging pairing remains available for older extensions.
 
@@ -36,11 +38,11 @@ To remove the app-link registration, remove `HKCU\Software\Classes\smowadl`. Old
 ## Features and behavior
 
 - Resolution ceiling, source codec selection (H.264 / VP9 / AV1 where available), quality preference, MP4 / MKV / WebM video, MP3 / M4A audio, folder picker.
-- One download at a time with an ordered queue, progress, speed, ETA, cancellation, retries and Explorer reveal.
+- One download at a time with a reorderable queue, pause/resume, Download next, bulk resume, progress, speed, ETA, cancellation, retries and opening the default file manager. Partial data is kept when paused; resuming depends on the source and interrupted conversion or trimming may restart that stage.
 - Searchable persistent history in `%APPDATA%\com.smowa.downloader\history.json`. Clearing history keeps downloaded files.
 - Resolution and codec controls reflect available source metadata. A chosen codec is a constraint, not a transcoding request. If a container/stream combination cannot be muxed, use MKV or another codec.
 - Best/balanced/smaller select source streams. Balanced favors 30 fps; smaller favors lower bitrate within a resolution. These may produce the same result when there is only one matching stream. Audio quality controls conversion quality.
-- Progress is per source stream and may reset between video and audio. Merging and audio conversion are shown as processing.
+- Progress is per source stream and may reset between video and audio. Transferred bytes and exact or estimated stream size are shown when available. Merging, conversion and finalizing have named stages without a fabricated percentage or ETA.
 - URLs and downloads are handled locally by yt-dlp. The original websites still receive network requests.
 
 ## Development

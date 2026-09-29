@@ -55,6 +55,8 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           node scripts/layout-check.mjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/improvements-check.mjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Build signed installer
         if: startsWith(github.ref, 'refs/tags/v')
         env:

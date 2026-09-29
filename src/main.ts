@@ -2,6 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   createIcons,
+  Pause,
+  Play,
+  ArrowUp,
+  ArrowDown,
   Copy,
   Download,
   History,
@@ -42,6 +46,11 @@ type Job = {
   url: string;
   status: string;
   percent: number;
+  queue_order?: number;
+  phase?: string;
+  downloaded_bytes?: number;
+  total_bytes?: number;
+  total_estimated?: boolean;
   speed: string;
   eta: string;
   error: string;
@@ -71,6 +80,7 @@ let jobs: Job[] = [],
   video: Video | null = null,
   analyzing = false,
   busy = false,
+  engineBusy = false,
   folder = localStorage.getItem("folder") || "",
   filter = "",
   statusFilter = "all",
@@ -79,6 +89,7 @@ let jobs: Job[] = [],
 const icons = () =>
   createIcons({
     icons: {
+      Pause, Play, ArrowUp, ArrowDown,
       Copy,
       Download,
       History,
@@ -139,10 +150,10 @@ async function call<T>(
 }
 
 document.querySelector("#app")!.innerHTML = `
-<main><header><div class="brand"><img class="brand-icon" src="${downloadIcon}" alt="" />SmowaDL <span class="brand-detail">Downloader</span></div><nav class="top-tabs" aria-label="Main navigation"><button data-page="downloads" aria-controls="downloads-page" aria-current="page" class="active">${icon("download")} Downloader</button><button data-page="history" aria-controls="history-page">${icon("history")} History/Queue <span id="queue-count" hidden></span></button><button data-page="settings" aria-controls="settings-page">${icon("settings-2")} Settings</button></nav><span id="crumb" class="sr-only">Downloader</span></header><div class="content"><p id="engine-banner" class="hint" role="status" hidden></p><section id="downloads-page"><div class="page-heading"><div><h1>New download</h1><p>Paste a link, choose your format, and save.</p></div><button class="secondary" id="focus-url">${icon("x")} Clear form</button></div>
+<main><header><div class="brand"><img class="brand-icon" src="${downloadIcon}" alt="" />SmowaDL <span class="brand-detail">Downloader</span></div><nav class="top-tabs" aria-label="Main navigation"><button data-page="downloads" aria-controls="downloads-page" aria-current="page" class="active">${icon("download")} Downloader</button><button data-page="history" aria-controls="history-page">${icon("history")} History/Queue <span id="queue-count" hidden></span></button><button data-page="settings" aria-controls="settings-page">${icon("settings-2")} Settings</button></nav><span id="crumb" class="sr-only">Downloader</span></header><div class="content"><p id="engine-banner" class="hint" role="status" hidden></p><div id="incoming-links" class="incoming-links" hidden><span id="incoming-summary"></span><button id="incoming-next" class="secondary">Save draft &amp; open next</button><button id="restore-draft" class="secondary" hidden>Restore previous draft</button></div><section id="downloads-page"><div class="page-heading"><div><h1>New download</h1><p>Paste a link, choose your format, and save.</p></div><button class="secondary" id="focus-url">${icon("x")} Clear form</button></div>
 <section class="composer"><div class="composer-top"><span class="section-label">${icon("link")} ADD A MEDIA LINK</span><div class="platforms"><span>YouTube</span><span>Vimeo</span><span>SoundCloud</span><span>+ hundreds more</span></div></div><form id="analyze-form"><label class="sr-only" for="url">Video URL</label><div class="url-row"><input id="url" type="url" required placeholder="Paste a video link here…" autocomplete="off"><button class="primary" id="analyze" type="submit">Get video ${icon("chevron-right")}</button></div></form><div id="analyze-error" class="inline-error" role="alert" hidden></div><div id="video-info" hidden></div><div id="options" hidden><div class="option-grid"><label>Format<select id="format"><option value="mp4">MP4 · Video</option><option value="mkv">MKV · Video</option><option value="webm">WebM · Video</option><option value="mp3">MP3 · Audio</option><option value="m4a">M4A · Audio</option></select></label><label>Resolution<select id="resolution"></select></label><label>Video codec<select id="codec"></select></label><label><span id="quality-label">Quality</span><select id="quality"><option value="best">Best available</option><option value="balanced">Balanced · prefer 30 fps</option><option value="small">Smaller · prefer lower bitrate</option></select></label></div><p class="hint" id="quality-hint">Original streams, no video re-encoding. Resolution is a maximum; availability depends on the video.</p><div class="clip-controls"><label class="update-toggle"><input id="clip-enabled" type="checkbox"> Download a section</label><div id="clip-fields" hidden></div></div><p id="download-error" class="inline-error" role="alert" hidden></p><div class="destination"><button id="choose-folder" class="folder-button">${icon("folder-open")}<span><small>SAVE TO</small><span id="folder-label"></span></span></button><button id="download" class="primary">${icon("arrow-down-to-line")} Download</button></div></div><div id="composer-hint" class="composer-hint">${icon("chrome")} Send the current video from your browser with the browser helper.</div></section>
-</section><section id="history-page" hidden><div class="page-heading"><div><h1>Your downloads</h1><p id="queue-summary">All your downloads in one place.</p></div><button class="secondary" id="history-new">${icon("plus")} New download</button></div><div class="history-filters" aria-label="Filter downloads"><button data-filter="all" aria-pressed="true">All</button><button data-filter="active" aria-pressed="false">In progress</button><button data-filter="completed" aria-pressed="false">Completed</button><button data-filter="attention" aria-pressed="false">Needs attention</button></div><div class="list-heading"><h2>Showing <span id="active-count">0</span></h2><button id="clear-history" class="secondary">Clear finished</button></div><label class="search-box">${icon("search")}<input id="search" placeholder="Search title or website" aria-label="Search downloads"></label><div id="history-list"></div><div class="tip"><span>${icon("circle-help")}</span><p>Downloads continue when you close this window.</p></div></section>
-<section id="settings-page" hidden><div class="page-heading"><div><h1>Settings</h1><p>Updates, browser integration, and download tools.</p></div></div><section class="setup-card"><h2>Download performance</h2><label for="fragment-concurrency">Parallel video parts</label><select id="fragment-concurrency"><option value="8">8 parts · Faster (recommended)</option><option value="4">4 parts · Balanced</option><option value="1">1 part · Compatibility</option></select><p class="hint">Downloads several parts of a video at once on supported sites. Applies to new downloads; direct files and FFmpeg section downloads may not benefit. If a site fails or slows down, try fewer parts.</p><p id="performance-saved" role="status"></p></section><section class="setup-card"><h2>App updates <span id="app-version"></span></h2><label class="update-toggle"><input type="checkbox" id="auto-updates"> Automatically download and install updates</label><p class="hint">Installs when downloads are finished and this window is closed. Your history and preferences are kept.</p><p id="update-status" role="status">Checking update settings...</p><div class="update-actions"><button id="check-update" class="secondary">Check for updates</button><button id="install-update" class="primary" hidden>Update now</button></div></section><div class="page-heading"><div><h1>Browser helper</h1><p>One click in your browser brings the current video to SmowaDL.</p></div></div><section class="setup-card"><div class="setup-icon">${icon("chrome")}</div><h2>Connect Brave or Chrome</h2><p>Load the included extension in Brave or Chrome once. Windows app links connect it automatically.</p><ol><li>Open <code>brave://extensions</code> (or <code>chrome://extensions</code>) and enable <strong>Developer mode</strong>.</li><li>Click <strong>Load unpacked</strong> and select the <code>extension</code> folder beside SmowaDL.exe.</li><li>Pin SmowaDL to the toolbar and click it on a video page.</li></ol><details class="legacy-helper"><summary>Legacy extension connection</summary><p class="hint">Only needed for older extensions.</p><label for="extension-id">Legacy browser extension ID</label><div class="url-row"><input id="extension-id" placeholder="32-letter extension ID" maxlength="32"><button id="connect" class="primary">Connect helper</button></div><p id="connect-result" role="status"></p></details><div class="hint">Pin SmowaDL to your browser toolbar. Click it on a video to open the download options, even when the app is closed.</div></section><section class="setup-card"><h2>Download engine</h2><p>yt-dlp downloads media. FFmpeg merges, trims and converts it. Node.js runs JavaScript that yt-dlp needs for sites such as YouTube; it is a helper, not a separate downloader. Tools check for the latest stable releases at startup and daily when downloads are idle.</p><div id="health" class="health"></div><p class="hint">If a site changes, use Set up / update tools below. Some private or restricted videos require authentication and are not supported by this version.</p><button id="check-tools" class="secondary">Check tools</button> <button id="setup-tools" class="secondary">Set up / update tools</button></section></section></div><footer><span><span class="status-dot"></span> <span id="footer-status">Ready when you are</span></span><span>Files stay on your computer</span></footer></main><div id="toast" class="toast" role="status" hidden></div>`;
+</section><section id="history-page" hidden><div class="page-heading"><div><h1>Your downloads</h1><p id="queue-summary">All your downloads in one place.</p></div><button class="secondary" id="history-new">${icon("plus")} New download</button></div><div class="history-filters" aria-label="Filter downloads"><button data-filter="all" aria-pressed="true">All</button><button data-filter="active" aria-pressed="false">In progress</button><button data-filter="completed" aria-pressed="false">Completed</button><button data-filter="attention" aria-pressed="false">Needs attention</button></div><div class="list-heading"><h2>Showing <span id="active-count">0</span></h2><div class="queue-tools"><button id="resume-all" class="secondary" hidden>Resume stopped downloads</button><button id="clear-history" class="secondary">Clear finished</button></div></div><label class="search-box">${icon("search")}<input id="search" placeholder="Search title or website" aria-label="Search downloads"></label><div id="history-list"></div><div class="tip"><span>${icon("circle-help")}</span><p>Downloads continue when you close this window.</p></div></section>
+<section id="settings-page" hidden><div class="page-heading"><div><h1>Settings</h1><p>Updates, browser integration, and download tools.</p></div></div><section class="setup-card"><h2>Download performance</h2><label for="fragment-concurrency">Parallel video parts</label><select id="fragment-concurrency"><option value="8">8 parts · Faster (recommended)</option><option value="4">4 parts · Balanced</option><option value="1">1 part · Compatibility</option></select><p class="hint">Downloads several parts of a video at once on supported sites. Applies to new downloads; direct files and FFmpeg section downloads may not benefit. If a site fails or slows down, try fewer parts.</p><p id="performance-saved" role="status"></p></section><section class="setup-card"><h2>App updates <span id="app-version"></span></h2><label class="update-toggle"><input type="checkbox" id="auto-updates"> Automatically download and install updates</label><p class="hint">Installs when downloads are finished and this window is closed. Your history and preferences are kept.</p><p id="update-status" role="status">Checking update settings...</p><div class="update-actions"><button id="check-update" class="secondary">Check for updates</button><button id="install-update" class="primary" hidden>Update now</button></div></section><div class="page-heading"><div><h1>Browser helper</h1><p>One click in your browser brings the current video to SmowaDL.</p></div></div><section class="setup-card"><div class="setup-icon">${icon("chrome")}</div><h2>Connect Brave or Chrome</h2><p>Load the included extension in Brave or Chrome once. Windows app links connect it automatically.</p><ol><li>Open <code>brave://extensions</code> (or <code>chrome://extensions</code>) and enable <strong>Developer mode</strong>.</li><li>Click <strong>Load unpacked</strong> and select the <code>extension</code> folder beside SmowaDL.exe.</li><li>Pin SmowaDL to the toolbar and click it on a video page.</li></ol><details class="legacy-helper"><summary>Legacy extension connection</summary><p class="hint">Only needed for older extensions.</p><label for="extension-id">Legacy browser extension ID</label><div class="url-row"><input id="extension-id" placeholder="32-letter extension ID" maxlength="32"><button id="connect" class="primary">Connect helper</button></div><p id="connect-result" role="status"></p></details><div class="hint">Pin SmowaDL to your browser toolbar. Click it on a video to open the download options, even when the app is closed.</div></section><section class="setup-card"><h2>Download engine</h2><p>yt-dlp downloads media. FFmpeg merges, trims and converts it. Node.js runs JavaScript that yt-dlp needs for sites such as YouTube; it is a helper, not a separate downloader. Tools check for the latest stable releases at startup and daily when downloads are idle.</p><div id="health" class="health"></div><div id="tool-stages" class="tool-stages" aria-live="polite"></div><p class="hint">If a site changes, use Set up / update tools below. Some private or restricted videos require authentication and are not supported by this version.</p><button id="check-tools" class="secondary">Check tools</button> <button id="setup-tools" class="secondary">Set up / update tools</button></section></section></div><footer><span><span class="status-dot"></span> <span id="footer-status">Ready when you are</span></span><span>Files stay on your computer</span></footer></main><div id="toast" class="toast" role="status" hidden></div>`;
 
 // Keep common choices prominent, with technical preferences available on demand.
 const advanced = document.createElement("details");
@@ -175,12 +186,48 @@ function restoreOptions() {
 }
 for (const id of ["format", "resolution", "codec", "quality"]) $(id).addEventListener("change", () => { if (id === "format") updateFormat(); rememberOptions(); $("download-error").hidden = true; });
 
+type Draft = { media: Video; values: Record<string, string>; clip: boolean; folder: string; advanced: boolean };
+const drafts: Draft[] = [];
+function incomingUI() {
+  $("incoming-links").hidden = !pending.length && !drafts.length;
+  $("incoming-summary").textContent = `${pending.length} browser link${pending.length === 1 ? "" : "s"} waiting${drafts.length ? ` · ${drafts.length} saved draft${drafts.length === 1 ? "" : "s"}` : ""}`;
+  $("incoming-next").hidden = !pending.length;
+  $<HTMLButtonElement>("incoming-next").disabled = analyzing;
+  $("restore-draft").hidden = !drafts.length;
+  $<HTMLButtonElement>("restore-draft").disabled = analyzing;
+}
+function saveDraft(): Draft | null {
+  if (!video) return null;
+  return {media: video, values: Object.fromEntries(["format","resolution","codec","quality","clip-start","clip-end"].map(id => [id, $<HTMLInputElement>(id).value])), clip: $<HTMLInputElement>("clip-enabled").checked, folder, advanced: advanced.open};
+}
+async function openIncoming() {
+  if (analyzing || !pending.length) return;
+  const draft = saveDraft(); if (draft) drafts.push(draft);
+  else if ($<HTMLInputElement>("url").value.trim()) pending.push($<HTMLInputElement>("url").value.trim());
+  const url = pending.shift()!; navigate("downloads"); $<HTMLInputElement>("url").value = url;
+  await analyze(url); incomingUI();
+}
+$("incoming-next").onclick = () => void openIncoming();
+$("restore-draft").onclick = async () => {
+  if (analyzing) return;
+  const draft = drafts.shift(); if (!draft) return;
+  const current = saveDraft(); if (current) drafts.push(current);
+  navigate("downloads"); $<HTMLInputElement>("url").value = draft.media.url;
+  await analyze(draft.media.url, draft.media);
+  $<HTMLSelectElement>("format").value = draft.values.format; updateFormat();
+  for (const id of ["resolution","codec","quality"]) $<HTMLSelectElement>(id).value = draft.values[id];
+  trim.restoreSelection(draft.values["clip-start"], draft.values["clip-end"]);
+  $<HTMLInputElement>("clip-enabled").checked = draft.clip; $("clip-fields").hidden = !draft.clip;
+  folder = draft.folder; updateFolder(); advanced.open = draft.advanced;
+  trim.toggle(draft.clip); updateFormat(); incomingUI();
+};
+$("resume-all").onclick = async () => { try { await call("resume_all"); await refresh(); } catch(e) { notify(String(e), true); } };
 function navigate(next: string) {
   page = next;
   $("settings-page").hidden = page !== "settings";
   $("downloads-page").hidden = page !== "downloads";
   $("history-page").hidden = page !== "history";
-  if (page !== "downloads") trim.toggle(false);
+  trim.toggle(page === "downloads" && $<HTMLInputElement>("clip-enabled").checked);
   document.querySelectorAll("[data-page]").forEach((b) => {
     const selected = (b as HTMLElement).dataset.page === page;
     b.classList.toggle("active", selected);
@@ -221,7 +268,7 @@ $("search").oninput = () => {
 $("clear-history").onclick = async () => {
   if (
     !confirm(
-      "Clear finished and stopped entries from history? Your downloaded files will be kept.",
+      "Clear completed, failed and cancelled entries from history? Paused and interrupted downloads will be kept. Your downloaded files will be kept.",
     )
   )
     return;
@@ -236,15 +283,19 @@ function renderJobs() {
   const queue = jobs.filter(active),
     history = jobs.filter(
       (j) => `${j.title} ${j.url}`.toLowerCase().includes(filter) &&
-        (statusFilter === "all" || (statusFilter === "active" ? active(j) : statusFilter === "completed" ? j.status === "completed" : ["failed", "cancelled", "interrupted"].includes(j.status))),
+        (statusFilter === "all" || (statusFilter === "active" ? active(j) : statusFilter === "completed" ? j.status === "completed" : ["failed", "cancelled", "interrupted", "paused"].includes(j.status))),
     );
-  history.sort((a, b) => Number(active(b)) - Number(active(a)) || b.created - a.created);
+  history.sort((a, b) => {
+    const rank = (j: Job) => ["downloading","processing"].includes(j.status) ? 0 : j.status === "queued" ? 1 : 2;
+    return rank(a)-rank(b) || (a.status === "queued" && b.status === "queued" ? (a.queue_order || a.created)-(b.queue_order || b.created) : b.created-a.created);
+  });
+  $("resume-all").hidden = !jobs.some(j => ["paused","interrupted"].includes(j.status));
   const focused = document.activeElement as HTMLElement | null;
-  const focusAction = focused?.dataset.action, focusId = focused?.dataset.id;
+  const focusAction = focused?.dataset.action, focusId = focused?.dataset.id, focusDirection = focused?.dataset.direction;
   const expanded = new Set(Array.from(document.querySelectorAll<HTMLDetailsElement>("#history-list details[open]")).map(el => el.closest<HTMLElement>("[data-job]")?.dataset.job));
   $("queue-summary").textContent = `${queue.length} in progress · ${jobs.filter(j => j.status === "completed").length} completed`;
   document.querySelectorAll<HTMLButtonElement>("[data-filter]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.filter === statusFilter)));
-  $<HTMLButtonElement>("clear-history").disabled = !jobs.some(j => !active(j));
+  $<HTMLButtonElement>("clear-history").disabled = !jobs.some(j => !active(j) && !["paused","interrupted"].includes(j.status));
   $("active-count").textContent = String(history.length);
   $("queue-count").textContent = String(queue.length);
   $("queue-count").hidden = !queue.length;
@@ -259,7 +310,7 @@ function renderJobs() {
       (b.onclick = async () => {
         b.disabled = true;
         try {
-          await call(b.dataset.action!, { id: b.dataset.id });
+          await call(b.dataset.action!, { id: b.dataset.id, ...(b.dataset.direction ? {direction: b.dataset.direction} : {}) });
           if (b.dataset.action === "copy_file") notify("File copied. Paste it into a folder or an app that accepts files.");
           await refresh();
         } catch (e) {
@@ -270,24 +321,27 @@ function renderJobs() {
       }),
   );
   document.querySelectorAll<HTMLDetailsElement>("#history-list details").forEach(el => { el.open = expanded.has(el.closest<HTMLElement>("[data-job]")?.dataset.job); });
-  if (focusAction && focusId) Array.from(document.querySelectorAll<HTMLButtonElement>("#history-list [data-action]")).find(b => b.dataset.action === focusAction && b.dataset.id === focusId)?.focus({preventScroll:true});
+  if (focusAction && focusId) Array.from(document.querySelectorAll<HTMLButtonElement>("#history-list [data-action]")).find(b => b.dataset.action === focusAction && b.dataset.id === focusId && b.dataset.direction === focusDirection)?.focus({preventScroll:true});
   icons();
 }
+const bytes = (n: number) => n >= 1073741824 ? `${(n / 1073741824).toFixed(2)} GiB` : `${(n / 1048576).toFixed(1)} MiB`;
 function card(j: Job) {
-  let host = "";
-  try {
-    host = new URL(j.url).hostname.replace("www.", "");
-  } catch {}
-  const running = active(j),
-    done = j.status === "completed";
-  return `<article class="job" data-job="${esc(j.id)}"><div class="job-icon ${done ? "complete" : ""}">${icon(done ? "check" : "film")}</div><div class="job-body"><div class="job-top"><h3 title="${esc(j.title)}">${esc(j.title || j.url)}</h3><span class="job-status ${esc(j.status)}">${esc(j.status)}</span></div><div class="job-meta">${esc(host)}<span>·</span>${esc(j.options.format.toUpperCase())}<span>·</span>${["mp3", "m4a"].includes(j.options.format) ? "Audio" : j.options.resolution ? j.options.resolution + "p" : "Best resolution"}<span>·</span>${new Date(j.created * 1000).toLocaleDateString()}${j.options.start_time != null ? `<span>·</span>Clip ${j.options.start_time}s–${j.options.end_time}s` : ""}</div>${running ? `<progress max="100" value="${j.percent}" aria-label="Download progress"></progress><div class="progress-label"><span>${j.status === "queued" ? "Waiting in queue" : j.status === "processing" ? "Merging / converting" : esc(j.speed) || "Connecting…"}</span><span>${j.eta ? "ETA " + esc(j.eta) + " · " : ""}${j.percent.toFixed(1)}%</span></div>` : ""}${j.error ? `<details><summary>Download details</summary><pre>${esc(j.error)}</pre></details>` : ""}</div><div class="job-actions">${done ? `<button class="icon-button" data-action="copy_file" data-id="${j.id}" aria-label="Copy file" title="Copy file">${icon("copy")}</button>` : ""}<button class="icon-button" data-action="${running ? "cancel" : done ? "reveal" : "retry"}" data-id="${j.id}" aria-label="${running ? "Cancel download" : done ? "Show in folder" : "Retry download"}" title="${running ? "Cancel download" : done ? "Show in folder" : "Retry download"}">${icon(running ? "x" : done ? "folder-open" : "rotate-ccw")}</button></div></article>`;
+  let host = ""; try { host = new URL(j.url).hostname.replace("www.", ""); } catch {}
+  const running = active(j), done = j.status === "completed";
+  const button = (action: string, label: string, glyph: string, direction = "") => `<button class="icon-button" data-action="${action}" data-direction="${direction}" data-id="${esc(j.id)}" aria-label="${label}" title="${label}">${icon(glyph)}</button>`;
+  const size = j.downloaded_bytes ? `${bytes(j.downloaded_bytes)}${j.total_bytes ? ` / ${j.total_estimated ? "~" : ""}${bytes(j.total_bytes)}` : ""}` : "";
+  const progress = running && j.status !== "queued" ? `<progress max="100" ${j.status === "processing" || !j.total_bytes ? "" : `value="${j.percent}"`} aria-label="Download progress"></progress><div class="progress-label"><span>${esc(j.phase || (j.status === "queued" ? "Waiting in queue" : "Connecting"))}${j.status === "downloading" && j.speed && j.speed !== "NA" ? ` · ${esc(j.speed)}` : ""}</span><span>${j.status === "downloading" ? `${size}${j.total_bytes ? ` · ${j.percent.toFixed(1)}%` : ""}${j.eta && j.eta !== "NA" ? ` · ETA ${esc(j.eta)}` : ""}` : ""}</span></div>` : "";
+  const reorder = j.status === "queued" ? `${button("reorder","Move earlier","arrow-up","up")}${button("reorder","Move later","arrow-down","down")}<button class="secondary next-job" data-action="reorder" data-direction="next" data-id="${j.id}">Download next</button>` : "";
+  const resume = ["paused","interrupted"].includes(j.status);
+  const actions = done ? button("copy_file","Copy file","copy") + button("reveal","Show in folder","folder-open") : running ? button("pause","Pause download","pause") + button("cancel","Cancel download","x") : button("retry",resume ? "Resume download" : "Retry download",resume ? "play" : "rotate-ccw");
+  return `<article class="job" data-job="${esc(j.id)}"><div class="job-icon ${done ? "complete" : ""}">${icon(done ? "check" : "film")}</div><div class="job-body"><div class="job-top"><h3 title="${esc(j.title)}">${esc(j.title || j.url)}</h3><span class="job-status ${esc(j.status)}">${esc(j.status)}</span></div><div class="job-meta">${esc(host)}<span>·</span>${esc(j.options.format.toUpperCase())}<span>·</span>${["mp3","m4a"].includes(j.options.format) ? "Audio" : j.options.resolution ? j.options.resolution + "p" : "Best resolution"}<span>·</span>${new Date(j.created * 1000).toLocaleDateString()}${j.options.start_time != null ? `<span>·</span>Clip ${j.options.start_time}s–${j.options.end_time}s` : ""}</div>${progress}${resume ? '<p class="hint">Partial downloads are kept. Some sources or conversion steps may restart.</p>' : ""}${j.error ? `<details><summary>Download details</summary><pre>${esc(j.error)}</pre></details>` : ""}${reorder ? `<div class="queue-order">${reorder}</div>` : ""}</div><div class="job-actions">${actions}</div></article>`;
 }
 
 $("analyze-form").onsubmit = async (e) => {
   e.preventDefault();
   await analyze($<HTMLInputElement>("url").value);
 };
-async function analyze(url: string) {
+async function analyze(url: string, restored?: Video) {
   if (analyzing) return;
   analyzing = true;
   video = null;
@@ -301,7 +355,7 @@ async function analyze(url: string) {
   $<HTMLButtonElement>("focus-url").disabled = true;
   $("analyze").textContent = "Getting video…";
   try {
-    video = await call<Video>("inspect_video", { url });
+    video = restored || await call<Video>("inspect_video", { url });
     $<HTMLInputElement>("clip-enabled").checked = false;
     $("clip-fields").hidden = true;
     trim.setMedia(video);
@@ -357,8 +411,9 @@ async function analyze(url: string) {
     $("composer-hint").hidden = false;
   } finally {
     analyzing = false;
+    incomingUI();
     $<HTMLButtonElement>("focus-url").disabled = false;
-    $<HTMLButtonElement>("analyze").disabled = false;
+    $<HTMLButtonElement>("analyze").disabled = engineBusy;
     $("analyze").innerHTML = `Get video ${icon("chevron-right")}`;
     icons();
   }
@@ -459,7 +514,7 @@ $("download").onclick = async () => {
     $("download-error").scrollIntoView({block:"nearest"});
   } finally {
     busy = false;
-    $<HTMLButtonElement>("download").disabled = false;
+    $<HTMLButtonElement>("download").disabled = engineBusy;
   }
 };
 $("connect").onclick = async () => {
@@ -498,7 +553,8 @@ type UpdateStatus = { enabled: boolean; message: string; version: string; ready:
 async function refreshUpdates() {
   if (!desktop) return;
   try {
-    const [status, engine] = await Promise.all([call<UpdateStatus>("update_status"), call<string>("engine_status")]);
+    const [status, engine, details] = await Promise.all([call<UpdateStatus>("update_status"), call<string>("engine_status"), call<{busy:boolean;tools:{name:string;stage:string}[]}>("engine_details")]);
+    if (details) { engineBusy = details.busy; $<HTMLButtonElement>("analyze").disabled = analyzing || engineBusy; $<HTMLButtonElement>("download").disabled = busy || engineBusy; $("tool-stages").innerHTML = details.tools.map(t => `<div><strong>${esc(t.name)}</strong><span>${esc(t.stage)}</span></div>`).join(""); $<HTMLButtonElement>("setup-tools").disabled = details.busy; }
     if (status) {
       $<HTMLInputElement>("auto-updates").checked = status.enabled;
       $("app-version").textContent = `v${status.version}`;
@@ -540,7 +596,8 @@ async function refresh() {
     if (changed) renderJobs();
     pending.push(...data.pending);
     if (data.storageError) notify(data.storageError, true);
-    if (pending.length && !analyzing) {
+    incomingUI();
+    if (pending.length && !engineBusy && !analyzing && !video && !$<HTMLInputElement>("url").value.trim()) {
       const url = pending.shift()!;
       navigate("downloads");
       $<HTMLInputElement>("url").value = url;
@@ -561,6 +618,7 @@ async function init() {
       const d = await call<{ folder: string }>("defaults");
       if (!folder) folder = d.folder;
       updateFolder();
+      await refreshUpdates();
       await refresh();
       setInterval(() => void refresh(), 700);
       await refreshUpdates();
