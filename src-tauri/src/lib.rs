@@ -20,14 +20,23 @@ pub struct Options {
     pub format: String,
     pub quality: String,
     pub folder: String,
+    #[serde(default = "default_fragment_concurrency")]
+    pub fragment_concurrency: u8,
     #[serde(default)]
     pub start_time: Option<f64>,
     #[serde(default)]
     pub end_time: Option<f64>,
 }
 
+fn default_fragment_concurrency() -> u8 {
+    8
+}
+
 pub fn download_args(o: &Options) -> Result<Vec<String>, String> {
     validate_url(&o.url)?;
+    if ![1, 4, 8].contains(&o.fragment_concurrency) {
+        return Err("Invalid parallel download setting".into());
+    }
     if ![0, 360, 480, 720, 1080, 1440, 2160, 4320].contains(&o.resolution) {
         return Err("Invalid resolution".into());
     }
@@ -43,6 +52,10 @@ pub fn download_args(o: &Options) -> Result<Vec<String>, String> {
         return Err("Choose an absolute download folder".into());
     }
     let mut args: Vec<String> = vec!["--newline","--progress","--no-colors","--windows-filenames","--no-overwrites","--progress-delta","0.5","--progress-template","download:SMOWA_PROGRESS:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s","--print","after_move:SMOWA_FILE:%(filepath)s","-o","%(title).160B [%(id)s] [%(format_id)s].%(ext)s","-P", &o.folder].into_iter().map(String::from).collect();
+    args.extend([
+        "--concurrent-fragments".into(),
+        o.fragment_concurrency.to_string(),
+    ]);
     match (o.start_time, o.end_time) {
         (None, None) => {}
         (Some(start), Some(end))
@@ -145,6 +158,7 @@ mod tests {
             format: "mp4".into(),
             quality: "best".into(),
             folder: std::env::temp_dir().to_string_lossy().into(),
+            fragment_concurrency: 8,
             start_time: None,
             end_time: None,
         }
@@ -328,4 +342,24 @@ fn recovers_unicode_paths_without_guessing_ambiguous_names() {
     std::fs::remove_file(unicode).unwrap();
     std::fs::remove_file(other).unwrap();
     std::fs::remove_dir(dir).unwrap();
+}
+
+#[test]
+fn validates_parallel_downloads_and_defaults_legacy_jobs() {
+    let legacy = serde_json::json!({"url":"https://example.com/video","resolution":0,"codec":"auto","format":"mp4","quality":"best","folder":std::env::temp_dir()});
+    let mut options: Options = serde_json::from_value(legacy).unwrap();
+    assert_eq!(options.fragment_concurrency, 8);
+    for threads in [1, 4, 8] {
+        options.fragment_concurrency = threads;
+        let args = download_args(&options).unwrap();
+        let index = args
+            .iter()
+            .position(|a| a == "--concurrent-fragments")
+            .unwrap();
+        assert_eq!(args[index + 1], threads.to_string());
+    }
+    for threads in [0, 2, 16, 255] {
+        options.fragment_concurrency = threads;
+        assert!(download_args(&options).is_err());
+    }
 }

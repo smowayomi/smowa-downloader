@@ -1,3 +1,3 @@
-SmowaDL 0.2.3 simplifies everyday downloads with Format and Resolution first, optional advanced controls, remembered preferences, and a sticky download action while trimming.
+SmowaDL 0.2.4 downloads up to eight video fragments concurrently by default. Settings > Download performance offers 8 (faster), 4 (balanced), or 1 (compatibility). The setting applies to new jobs and is preserved with each history entry.
 
-History now has All, In progress, Completed and Needs attention filters, with active downloads first. Keyboard focus and expanded error details survive progress updates. Settings hides legacy extension configuration until needed. Ctrl+L focuses the media link; Clear form starts fresh.
+A controlled two-round HLS test took 9.47 seconds on average with one part versus 4.97 seconds with eight, with identical output checksums. This is one source and connection, not a guarantee for other sites. Direct files and FFmpeg section downloads may not benefit.

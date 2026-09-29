@@ -122,6 +122,7 @@ try {
   await page.locator('#history-list .job-status').filter({hasText:'queued'}).waitFor();
   if (await page.locator('#search').inputValue()) throw Error('New download hidden by search');
   const clip = await page.evaluate(() => window.testJobs[0].options);
+  if (clip.fragment_concurrency !== 8) throw Error('Parallel download default missing');
   if (clip.start_time !== 10 || clip.end_time !== 15.5) throw Error('Timestamp conversion failed');
   console.log('PASS timestamp validation and section request');
   await page.evaluate(() => { window.testJobs[0].status = 'completed'; window.testJobs[0].percent = 100; });
@@ -181,6 +182,9 @@ try {
     path: ".preview/smowaudio-helper.png",
     fullPage: true,
   });
+  await page.locator('#fragment-concurrency').selectOption('4');
+  if (await page.evaluate(() => localStorage.getItem('fragment-concurrency')) !== '4') throw Error('Parallel preference not saved');
+  console.log("PASS parallel download setting and default request");
   console.log("PASS: loading and loaded layouts, helper navigation");
 } finally {
   await browser.close();
